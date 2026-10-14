@@ -25,6 +25,6 @@ type Inline =
 interface Asset { id: string; ext: 'png'|'jpg'|'gif'|'bmp'|'svg'; bytes: Uint8Array; widthPx: number; heightPx: number }
 ```
 
-- 지원 이미지 확장자는 스파이크로 확정한다 [검증 필요 S-04].
+- 이미지는 PNG 삽입을 확인했고 그 외 확장자는 미검증이다 [검증 필요 S-04].
 - ```` ```mermaid ```` 코드펜스는 `diagram` 블록이 되고 렌더 후 `assetId`가 채워진다.
 - `<!-- hwp:pagebreak -->`, `<!-- hwp:toc -->` 주석은 해당 블록으로 변환한다.

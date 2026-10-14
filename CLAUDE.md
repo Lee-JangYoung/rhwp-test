@@ -1,18 +1,18 @@
 # CLAUDE.md
 
 ## 프로젝트
-LLM이 Markdown으로 작성한 SI 산출물(유스케이스·클래스·DB 명세서)을 **지정 양식의 HWP/HWPX와 Excel로 변환**한다.
+LLM이 Markdown으로 작성한 SI 산출물(유스케이스·클래스·DB 명세서)을 **지정 양식의 HWPX 파일로 변환**한다.
 Markdown이 원본이고 산출물 파일은 생성물이다. HWP 엔진은 rhwp(`@rhwp/core` 0.8.7 고정).
 목표 충실도: 한컴에서 열었을 때 양식과 거의 동일 (검증 기준은 미정).
 
 ## 범위 (사용자가 말한 것만)
 - 입력: Markdown. 문서 유형별 템플릿·규약·검증, 위반은 LLM에 되돌려 수정
-- 출력: HWP/HWPX, Excel (양식 파일 기반)
+- 출력: **HWPX 우선**(양식 파일 기반). HWP 5.0·Excel은 후순위
 - 다이어그램: ```` ```mermaid ```` 블록을 이미지로 렌더해 삽입
 - 양식 등록: 샘플 양식을 분석해 md 양식을 도출 (분석은 프로그램, 의미 해석은 LLM 보조, 사람이 승인)
 - 제공 형태: 공통 코어 + CLI + MCP. 웹 UI와 서버(다수 사용자)는 방안만 유지하고 후순위
 - 엔진(라이브러리)은 인터페이스로 분리해 나중에 교체 가능하게 한다
-- **범위 밖** (사용자가 요청하기 전에는 제안·구현하지 않는다): DOCX/PPTX/Google 출력 구현, 프로필 승인 워크플로·권한·감사 로그, 그 밖의 기능 확장
+- **후순위·범위 밖** (사용자가 요청하기 전에는 제안·구현하지 않는다): HWP 5.0·Excel·DOCX/PPTX/Google 출력, 프로필 승인 워크플로·권한·감사 로그, 그 밖의 기능 확장
 
 ## 작업 규칙
 1. 파일 수정·삭제, 커밋, 푸시, PR 전에 **계획과 작업 내용을 먼저 보여 주고 승인**을 받는다. 읽기 전용 조사와 scratchpad 임시 시험은 승인 없이 해도 된다.
@@ -26,7 +26,7 @@ Markdown이 원본이고 산출물 파일은 생성물이다. HWP 엔진은 rhwp
 한국어, 핵심 위주로 간결하게. 주장에는 근거와 URL을 붙이고 최신 정보를 확인한다. 코드는 요청할 때만 제공한다.
 
 ## rhwp 0.8.7 주의점 (시험으로 확인, 상세는 `_spec/06-quality/verification-spike.md`)
-- Node에서는 `initSync`와 `globalThis.measureTextWidth`가 필요하다. 근사 폭 측정은 쪽수·줄바꿈이 부정확하다.
+- Node에서는 `initSync`로 로드한다. README는 `globalThis.measureTextWidth`를 요구하지만 시험에서는 호출되지 않았다(폭 계산 경로·쪽수 정확도는 미확인, S-11).
 - 기반 문서는 `createEmpty()`가 아니라 인스턴스 `createBlankDocument()`(번들 템플릿: 스타일·구역 정의 포함)를 쓴다.
 - 0번 문단은 구역 정의를 가져 블록 복제(`importParagraphBlock`) 대상에서 제외한다. 표 위치는 `getControls()`로 확인한다.
 - `replaceOne`은 표 셀에서 동작하지 않는다(`replaceAll`은 동작).

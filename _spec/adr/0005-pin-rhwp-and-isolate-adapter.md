@@ -1,6 +1,6 @@
 # ADR-0005: rhwp 버전 고정과 어댑터 격리
 
-- 상태: 제안
+- 상태: 제안 ([ADR-0009](0009-engine-interface.md)가 엔진 인터페이스로 일반화)
 - 날짜: 2026-10-14
 
 ## 배경
@@ -8,7 +8,7 @@
 
 ## 결정
 1. `@rhwp/core`와 `@rhwp/editor`를 **정확한 버전(0.8.7)** 으로 고정한다(`^` 사용 안 함).
-2. rhwp 호출은 `rhwp-adapter` 한 모듈에만 둔다([rhwp-adapter.md](../02-architecture/rhwp-adapter.md)).
+2. rhwp 호출은 엔진 구현(`engines/rhwp`) 한 곳에만 둔다([engine-interface.md](../02-architecture/engine-interface.md)).
 3. 인자가 많은 API는 `*Ex(optionsJson)` 변형을 우선한다.
 4. 버전 상향은 별도 PR에서 CHANGELOG `### API` 확인, 어댑터 왕복 테스트, 골든 비교를 거친다.
 
