@@ -16,12 +16,13 @@
 | S-08 | 인라인 서식 구간 적용 | 미검증 | md-element-mapping |
 | S-09 | 각주 삽입 | 미검증 | md-element-mapping |
 | S-10 | 본문 시작 위치 지정(책갈피/치환) | 미검증 | doctype-profile |
-| S-11 | 글꼴 메트릭 기반 폭 측정 시 쪽수 정확도 | 미검증 | adr-0003, L-02 |
+| S-11 | 폭 계산 경로(`measureTextWidth` 등)와 쪽수 정확도 | 미검증 — Node 시험에서 `measureTextWidth`가 호출되지 않아 실제 폭 계산 경로 확인 필요 | adr-0003, L-02 |
 | S-12 | 대용량 성능, `beginDeferredPagination` 효과 | 미검증 | architecture |
 | S-13 | Worker + OffscreenCanvas 폭 측정 | 미검증 | web-ui |
 | S-14 | `exportHwp(x)` 반환 형태와 `contentLoss` 사용법 | **성공** — `exportHwp()`·`exportHwpx()`는 `Uint8Array` 반환, `*WithReport`는 `hasBytes()`/`contentLoss()`(JSON), `exportHwpVerify()`는 `{bytesLen, pageCountBefore/After, recovered}` | engine-interface, L-09 |
 | S-15 | `createBlankDocument()`(번들 템플릿) 사용법과 한컴 호환 | **부분** — 인스턴스 메서드(`createEmpty()` 후 호출)로 스타일 목록과 구역·단 정의를 가진 문서가 됨. 한컴 열림 미확인 | known-limitations L-11 |
 | S-16 | Mermaid PNG 렌더의 결정성(같은 입력 → 같은 이미지)과 환경 고정 | 미검증 (렌더 자체는 성공: mermaid-cli + Chromium `--no-sandbox`, 다이어그램당 약 3초, 한글 레이블 정상) | mermaid |
+| S-17 | 글꼴이 쪽수·줄 배치(`lineseg`)에 미치는 영향: (a) 같은 글꼴/대체 글꼴에서 쪽수 비교, (b) 한컴이 저장된 `lineseg`를 재사용하는지 재계산하는지, (c) 리포트의 `fontsUsed`/`fontSubstitutions` 활용 | 미검증 — `getDocumentInfo()`의 `fontsUsed`/`fontSubstitutions` 조회, HWPX에 글꼴 이름만 기록되고 `lineseg`가 저장됨은 확인 | L-12, S-11, adr-0003 |
 | R-01 | 실제 양식에서 표 구조·병합·머리행·필드·스타일·개요 추출 정확도 | **부분** — `getControls`, `getTableDimensions`, `getCellInfo`(병합 포함) 동작. 실제 양식 미검증 | doctype-profile |
 | R-02 | 양식의 반복 블록을 복제·채울 수 있는가 | **부분** — 표 행 추가·삭제, 표 복제(`copyControl`+`pasteControl`), 문단·표 블록 반복(`importParagraphBlock`의 `count`, 0번 문단 제외, `dryRun` 무변경), `replaceAll`(표 셀 포함 전체 치환). **복제본별 값 채움이 미해결**: `replaceOne`은 본문 순차만 되고 표 셀은 안 됨 → 셀 주소 지정 API 또는 고유 필드명 검증 필요 | doctype-profile |
 | R-03 | LLM 해석 초안(프로필)이 사람이 보정 가능한 품질인가 | 미검증 (양식 샘플 필요, 후순위) | adr-0006, adr-0007 |
