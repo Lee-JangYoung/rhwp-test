@@ -1,0 +1,30 @@
+{
+  "name": "rhwp-md2hwpx-poc",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "PoC: Markdown -> HWPX via @rhwp/core (feasibility check)",
+  "engines": { "node": ">=22.13.0" },
+  "scripts": {
+    "poc": "tsx src/cli.ts",
+    "make-template": "tsx scripts/make-template.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mermaid-js/mermaid-cli": "12.0.0",
+    "@rhwp/core": "0.8.7",
+    "ajv": "8.20.0",
+    "remark-frontmatter": "5.0.0",
+    "remark-gfm": "4.0.1",
+    "remark-parse": "11.0.0",
+    "unified": "11.0.5",
+    "yaml": "2.9.1"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vitest": "5.0.4"
+  }
+}
