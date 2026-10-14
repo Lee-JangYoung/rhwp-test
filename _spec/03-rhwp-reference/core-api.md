@@ -12,7 +12,9 @@
 | 용도 | 메서드 | 상태 |
 |---|---|---|
 | 초기화 | `init`, `initSync`, `version()` | 확인됨 (Node `initSync`) |
-| 문서 열기/생성 | `new HwpDocument(bytes)`, `createBlankDocument()` | 확인됨 |
+| 문서 열기/생성 | `new HwpDocument(bytes)`, 정적 `createEmpty()` | 확인됨 |
+| 문서 생성(번들 템플릿) | 인스턴스 `createBlankDocument(): string` | 미검증 (S-15) |
+| 양식 구조 조회 | `getControls`, `getTableDimensions`, `getCellInfo`(병합 정보), `getStructure(mode)` | 일부 확인 (R-01) |
 | 쪽수/텍스트 | `pageCount()`, `getPageText(n)`, `getParagraphCount(sec)` | 확인됨 |
 | 텍스트 | `insertText(sec,para,off,text)` | 확인됨 |
 | 문단 | `insertParagraph`, `splitParagraph` | 미검증 (S-07) |

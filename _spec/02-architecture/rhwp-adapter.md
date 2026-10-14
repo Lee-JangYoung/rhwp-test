@@ -27,7 +27,7 @@ interface HwpWriter {
 
 ## 책임
 어댑터: 구역/문단/오프셋 계산, JSON 문자열 응답 파싱과 `ok` 검사, 스타일 이름 → ID 해석, 반환 형태 정규화, `free()`.
-그 외(`core`): 어떤 스타일을 쓸지 결정(style-map).
+그 외(`core`): 어떤 스타일을 쓸지 결정(프로필의 `profile.yaml`).
 
 ## 구현 시 유의
 - "문서 끝에 추가" 헬퍼가 필요하다(위치 지정이 `(sec, para, charOffset)`).

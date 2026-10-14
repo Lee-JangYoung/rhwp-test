@@ -1,35 +1,33 @@
 # 아키텍처
 
-결정: [ADR-0001](../adr/0001-monorepo-core-cli-web.md), [ADR-0003](../adr/0003-environment-agnostic-core.md), [ADR-0005](../adr/0005-pin-rhwp-and-isolate-adapter.md)
+결정: [ADR-0001](../adr/0001-monorepo-core-cli-web.md), [ADR-0003](../adr/0003-environment-agnostic-core.md), [ADR-0005](../adr/0005-pin-rhwp-and-isolate-adapter.md), [ADR-0006](../adr/0006-template-registration-and-doctype-profile.md), [ADR-0007](../adr/0007-llm-by-host-agent-conversion-llm-free.md), [ADR-0008](../adr/0008-core-with-cli-mcp-web-adapters.md)
 
 ## 패키지
 
 | 패키지 | 책임 |
 |---|---|
-| `core` | 파싱, IR, 스타일 매핑, 렌더 계획, 검증. rhwp 호출은 `core/adapter`에만 |
-| `cli` | 인자 처리, 파일 I/O, Mermaid 렌더(`mermaid-cli`), 리포트 출력 |
-| `web` | UI, 업로드/다운로드, SVG 미리보기 |
+| `core` | 양식 분석, 프로필 로드·검증, md 파싱, IR, 렌더 계획, 변환, 검증. rhwp 호출은 `core/adapter`에만 |
+| `cli` | 인자 처리, 파일 I/O, Mermaid 렌더(`mermaid-cli`), 리포트 출력 (1순위 어댑터) |
+| `mcp` | LLM 에이전트용 도구 노출(stdio) (2순위) |
+| `web` | 프로필 선택, 업로드/다운로드, SVG 미리보기 (3순위) |
 
 스택(제안): TypeScript, pnpm workspace, Vitest, remark/unified, yaml, Vite.
+프로필 저장·관리와 다중 사용자(서버) 제공 방식은 **미결**이다.
 
-## 데이터 흐름
+## 두 흐름
 
 ```
-input.md
- ① parse      remark, front-matter 분리
- ② normalize  IR 생성, 에셋 수집
- ③ preprocess Mermaid → 이미지 (환경별 주입)
- ④ plan       style-map 적용 → 렌더 명령
- ⑤ execute    어댑터: 양식 로드 → 필드 → 본문 → 스타일
- ⑥ export     HWP / HWPX
- ⑦ verify     재로드, 쪽수·텍스트 비교, 손실 확인
+[등록] 샘플 양식 → 분석(core) → 해석 초안(호스트 LLM) → 스키마 검증·조립(core) → 사람 승인 → 프로필
+[변환] md → ① parse → ② normalize(IR) → ③ preprocess(Mermaid→이미지) → ④ plan(프로필 적용)
+         → ⑤ execute(어댑터: 양식 로드·필드·본문·스타일) → ⑥ export(HWP/HWPX) → ⑦ verify
 ```
 
-①~④는 rhwp와 무관한 순수 함수(단위 테스트 용이), ⑤⑥만 어댑터에 의존한다.
+- 등록·변환 모두 ①~④와 분석은 rhwp와 무관한 순수 함수(단위 테스트 용이), ⑤⑥과 양식 분석의 rhwp 조회만 어댑터에 의존한다.
+- 변환 경로에는 LLM이 없다([ADR-0007](../adr/0007-llm-by-host-agent-conversion-llm-free.md)). 상세: [doctype-profile.md](../04-conversion/doctype-profile.md)
 
 ## 환경 주입
 
-| 항목 | CLI(Node) | 웹 |
+| 항목 | CLI/MCP(Node) | 웹 |
 |---|---|---|
 | WASM 로드 | `initSync({module: bytes})` | `init({module_or_path})` |
 | `measureTextWidth` | 글꼴 메트릭/canvas 라이브러리 | Canvas 2D `measureText` |

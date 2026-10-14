@@ -33,6 +33,7 @@
 
 | 시나리오 | 결과 |
 |---|---|
-| `createBlankDocument()` → `insertText` → `exportHwp()` → `new HwpDocument(bytes)` | 성공, 텍스트 보존 |
-| 빈 문서의 `getStyleList()` | 빈 배열 → 스타일이 있는 양식 파일이 필요 |
+| `HwpDocument.createEmpty()` → `insertText` → `exportHwp()` → `new HwpDocument(bytes)` | 성공, 텍스트 보존 (S-00) |
+| `createTable(0,0,0,3,2)` 후 `getControls()`, `getTableDimensions`, `getCellInfo` | 표 컨트롤, `{rowCount:3,colCount:2}`, 셀의 행·열·병합 정보 반환 (R-01 일부). 저장·재로드 후 표 위치 해석은 미확인 |
+| `createEmpty()` 문서의 `getStyleList()` | 빈 배열 → 스타일이 있는 양식 파일이 필요 |
 | 근사 `measureTextWidth` 사용 | 동작은 하나 레이아웃 정확도는 별도 검증 필요 |
