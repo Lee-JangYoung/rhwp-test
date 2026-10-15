@@ -2,8 +2,42 @@ packages:
   - packages/*
 
 # 의존성 버전은 여기서 정확히 고정한다 (ADR-0013)
+allowBuilds:
+  esbuild: false
+  puppeteer: false
+
 catalog:
+  # 도구
   '@biomejs/biome': 2.5.15
+  '@playwright/test': 1.64.1
   '@types/node': 24.19.2
+  tsx: 4.23.15
   typescript: 7.0.2
   vitest: 5.0.4
+  # 코어·CLI
+  '@mermaid-js/mermaid-cli': 12.0.0
+  '@rhwp/core': 0.8.7
+  '@types/mdast': 4.0.4
+  ajv: 8.20.0
+  remark-frontmatter: 5.0.0
+  remark-gfm: 4.0.1
+  remark-parse: 11.0.0
+  unified: 11.0.5
+  yaml: 2.9.1
+  # 웹
+  '@rhwp/editor': 0.8.7
+  '@types/react': 19.3.0
+  '@types/react-dom': 19.3.0
+  '@vitejs/plugin-react': 6.1.2
+  mermaid: 12.2.0
+  react: 19.3.1
+  react-dom: 19.3.1
+  vite: 8.3.4
+
+minimumReleaseAgeExclude:
+  - '@playwright/test@1.64.1'
+  - playwright-core@1.64.1
+  - playwright@1.64.1
+  - react-dom@19.3.1
+  - react@19.3.1
+

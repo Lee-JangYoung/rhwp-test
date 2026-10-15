@@ -1,7 +1,8 @@
+import { createRhwpEngine } from '@yangsik/core';
+import { rhwpEngine } from '@yangsik/core/node';
 import { expect, test } from 'vitest';
-import { CORE_DEPENDENCY, PACKAGE_NAME } from '../src/index';
 
-test('cli가 워크스페이스의 core를 참조한다', () => {
-  expect(PACKAGE_NAME).toBe('@yangsik/cli');
-  expect(CORE_DEPENDENCY).toBe('@yangsik/core');
+test('cli가 워크스페이스의 core와 core/node를 참조한다', () => {
+  expect(typeof createRhwpEngine).toBe('function');
+  expect(rhwpEngine.id).toBe('rhwp');
 });
