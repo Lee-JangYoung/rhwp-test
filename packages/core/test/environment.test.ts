@@ -28,6 +28,7 @@ describe('환경 독립 (ADR-0011)', () => {
       [
         'GUIDE_TOPICS',
         'ISSUE_CODES',
+        'ProfileError',
         'ValidationError',
         'analyzeTemplate',
         'buildProfileSchema',
@@ -37,10 +38,11 @@ describe('환경 독립 (ADR-0011)', () => {
         'describeKinds',
         'formatViolations',
         'getProfileGuide',
-        'parseMarkdown',
         'parseProfile',
         'previewMapping',
-        'validateIr',
+        'readMarkdown',
+        'testProfile',
+        'validateData',
       ].sort(),
     );
   });

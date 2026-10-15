@@ -58,7 +58,7 @@ bindings:
 | `md.collections.<이름>.slots[].as` | enum(kv / records / list / text / code / table) | 필수 | 읽는 방식: kv=키-값 표, records=목록형 표(행 레코드), list=목록, text=서술 문단, code=코드 블록, table=표 원형 |
 | `md.collections.<이름>.slots[].key` | string | 필수 | 데이터 이름(바인딩의 경로에서 쓴다) |
 | `md.collections.<이름>.slots[].under` | string | 선택 | 이 제목 아래의 내용만 읽는다(하위 제목 텍스트) |
-| `md.collections.<이름>.slots[].optional` | boolean | 선택 | 없어도 규약 위반이 아님 (기본 false) |
+| `md.collections.<이름>.slots[].optional` | boolean | 선택 | 없어도 규약 위반이 아님(기본 false, code 슬롯은 true) |
 | `md.collections.<이름>.slots[].lang` | string | 선택 | as가 code일 때 코드 블록 언어(예: mermaid) |
 | `md.collections.<이름>.children` | object | 선택 | 하위 컬렉션(이름 → 컬렉션) |
 | `md.collections.<이름>.children.<이름>` | object | 선택 | 반복되는 md 구조(예: 항목 제목 하나) |
@@ -214,6 +214,10 @@ bindings:
 | `slot-unused` | md에서 읽지만 어디에도 쓰이지 않는 슬롯 | 의도한 것이면 둔다. 아니면 바인딩에 연결하거나 슬롯을 지운다. |
 | `label-unmapped` | 양식 라벨이 매핑되지 않음 | 값을 넣어야 하면 map에 추가한다. 비워도 되면 둔다(unmappedValue에 따라 비워진다). |
 | `file-not-found` | 프로필이 가리키는 파일이 없음 | template·schema 경로(프로필 폴더 기준 상대 경로)를 확인한다. |
+| `name-conflict` | 같은 컬렉션 안에서 캡처·슬롯·하위 컬렉션 이름이 겹침 | 이름이 서로 다르게 고친다(제목 패턴의 {이름}, 슬롯 key, children 이름). |
+| `collection-empty` | 반복할 항목이 없음(변환 중 확인) | md에 항목을 추가하거나, 없어도 되면 repeat의 onEmpty를 keep으로 한다. |
+| `renderer-missing` | 다이어그램 렌더러가 없음(변환 중 확인) | 렌더러를 연결하거나 policy.onMissingRenderer를 warn/ignore로 한다. |
+| `schema-required-unmapped` | md 규약의 필수 항목이 양식에 채워지지 않을 수 있음 | cells.map에 해당 라벨을 추가하거나 '*'를 쓰고, 양식의 라벨에 있는지 확인한다. |
 | `binding-empty` | 바인딩이 하는 일이 없음 | map·columns 등 동작 내용을 채운다. |
 
 각 오류에는 `path`(프로필 안 위치), `line`, `candidates`(가까운 후보)가 있다. 후보가 있으면 그중에서 고른다.

@@ -1,18 +1,35 @@
-import { labelCells } from './blocks';
-import type { DocumentEngine, PageBreakMode, TableRef } from '../engine/types';
-import { parseMarkdown, type Ir } from '../markdown/parse';
-import { formatViolations, validateIr, type Violation } from '../markdown/validate';
-import { verifyOutput, type Expected, type VerifyReport } from './verify';
+import type { DocumentEngine, TableRef } from '../engine/types';
+import { readMarkdown } from '../markdown/read';
+import { formatViolations, validateData, type Violation } from '../markdown/validate';
+import { checkProfile } from '../profile/check';
+import type { Issue } from '../profile/issues';
+import type { Binding, Locator, Policy, Profile, ValueSpec } from '../profile/types';
+import { type LabelOptions, labelCells } from './blocks';
+import { findTables } from './resolve';
+import { getPath, type Scopes, resolveValue } from './values';
+import { type Expected, type VerifyReport, verifyOutput } from './verify';
 
-/** front-matter 키 → 양식 누름틀 이름 */
-export const FIELD_MAP: Record<string, string> = { title: '문서명', version: '버전', author: '작성자', date: '작성일' };
-
+/** md가 프로필의 md 규칙·규약(JSON Schema)과 맞지 않음. 줄 번호와 함께 LLM에 되돌려 고치게 한다. */
 export class ValidationError extends Error {
   constructor(
     public violations: Violation[],
     file: string,
   ) {
     super(`규약 위반 ${violations.length}건\n${formatViolations(file, violations)}`);
+  }
+}
+
+/** 프로필이 양식과 맞지 않거나(점검 실패) 변환 중 오류가 확인됨. 구조화된 항목(코드·경로·후보)을 가진다. */
+export class ProfileError extends Error {
+  constructor(public issues: Issue[]) {
+    super(
+      `프로필 오류 ${issues.length}건\n${issues
+        .map(
+          (i) =>
+            `  [${i.code}] ${i.path}${i.line ? ` (프로필 ${i.line}줄)` : ''} ${i.message}${i.candidates?.length ? ` — 후보: ${i.candidates.slice(0, 3).join(', ')}` : ''}`,
+        )
+        .join('\n')}`,
+    );
   }
 }
 
@@ -30,13 +47,16 @@ export interface ConvertInput {
   mdName?: string;
   mdText: string;
   template: Uint8Array;
-  schema: object;
-  /** 없으면 Mermaid 렌더와 그림 삽입을 건너뛴다 */
+  /** 프로필(parseProfile의 결과). 변환 전에 checkProfile을 실행한다 */
+  profile: Profile;
+  /** md 규약(JSON Schema). 프로필의 `schema` 파일 내용 */
+  dataSchema?: object;
+  /** 없으면 다이어그램이 필요한 항목에서 policy.onMissingRenderer를 따른다 */
   renderDiagram?: DiagramRenderer;
-  /** 반복 블록 표의 쪽 경계 설정 (기본 cell = 셀 단위로 나눔, 한컴 샘플에서 가장 흔한 값) */
-  tableSplit?: PageBreakMode;
-  /** false면 표 높이 맞춤을 건너뛴다 (자체 검증이 낡은 높이를 잡는지 시험할 때만 사용) */
-  fitHeights?: boolean;
+  /** true면 diagrams 바인딩을 명시적으로 건너뛴다(렌더·삽입 없음) */
+  skipDiagrams?: boolean;
+  /** 프로필의 output을 덮어쓴다(시험·미리보기용) */
+  output?: Partial<Omit<Profile['output'], 'diagram'>>;
   /** true면 쪽별 SVG를 만든다 */
   preview?: boolean;
 }
@@ -49,127 +69,251 @@ export interface ConvertReport {
   imagesInserted: number;
   diagrams: { name: string; ms: number; widthPx: number; heightPx: number }[];
   warnings: string[];
+  /** 변환 중 확인된 프로필 관련 항목(경고 수준) */
+  issues: Issue[];
   pages: number;
   verify: VerifyReport;
   timingsMs: Record<string, number>;
 }
 
-/** 항목 하나가 양식 표에 채우는 "라벨 → 값" */
-export function blockValues(item: Ir['items'][number]): Record<string, string> {
-  return {
-    'UC ID': item.id,
-    유스케이스명: item.name,
-    ...item.fields,
-    '기본 흐름': numbered(item.flows.main),
-    ...(item.flows.alt.length ? { '대안 흐름': numbered(item.flows.alt) } : {}),
-  };
-}
+const severity = (p: Policy): Issue['severity'] | null => (p === 'ignore' ? null : p === 'warn' ? 'warning' : 'error');
 
-const numbered = (lines: string[]) => lines.map((s, i) => `${i + 1}. ${s}`).join('\n');
+/** 항목의 이름: 제목 패턴의 첫 캡처 값(데이터 노드는 캡처를 먼저 담는다). 그림 설명 등에 쓴다 */
+const firstCapture = (item: Record<string, unknown>): string | undefined =>
+  Object.values(item).find((v): v is string => typeof v === 'string');
 
 export async function convertBytes(
   engine: DocumentEngine,
   o: ConvertInput,
 ): Promise<{ bytes: Uint8Array; report: ConvertReport; previews: string[] }> {
   const mdName = o.mdName ?? 'input.md';
+  const { profile } = o;
   const timings: Record<string, number> = {};
-  const lap = (k: string, t0: number) => (timings[k] = Date.now() - t0);
+  const lap = (k: string, t0: number) => {
+    timings[k] = Date.now() - t0;
+  };
   const warnings: string[] = [];
+  const issues: Issue[] = [];
+  const output = { ...profile.output, ...o.output };
 
-  // 1) 파싱·검증 (P1)
+  // 1) 프로필 점검: 프로필이 양식과 맞지 않으면 변환하지 않는다
   let t0 = Date.now();
-  const ir: Ir = parseMarkdown(o.mdText);
-  for (const w of ir.warnings) warnings.push(`${mdName}:${w.line} ${w.message}`);
-  const violations = validateIr(ir, o.schema);
+  const check = await checkProfile(engine, profile, o.template, { dataSchema: o.dataSchema });
+  const checkErrors = check.issues.filter((i) => i.severity === 'error');
+  if (checkErrors.length) throw new ProfileError(checkErrors);
+  for (const i of check.issues) warnings.push(`프로필 ${i.path}: ${i.message}`);
+  lap('check', t0);
+
+  // 2) md 읽기·검증: 구조(프로필의 md 규칙)가 먼저, 규약(JSON Schema)은 추가 제약
+  t0 = Date.now();
+  const md = readMarkdown(profile, o.mdText);
+  for (const w of md.warnings) warnings.push(`${mdName}:${w.line} ${w.message}`);
+  const violations = [
+    ...md.violations,
+    ...(o.dataSchema ? validateData(md.data, o.dataSchema, md.lines, md.violations) : []),
+  ].sort((a, b) => a.line - b.line);
   lap('parse+validate', t0);
   if (violations.length) throw new ValidationError(violations, mdName);
 
-  // 2) 양식 열기 (P2)
+  // 3) 양식 열기
   t0 = Date.now();
   const s = await engine.open(o.template);
   lap('open', t0);
   try {
-    const analysis = s.analyze();
-    if (analysis.sections > 1) throw new Error(`다중 구역 양식(${analysis.sections}개)은 PoC에서 지원하지 않습니다`);
-    const protos = analysis.tables.map((t) => t.ref);
-    if (protos.length === 0) throw new Error('양식에 반복 블록으로 쓸 표가 없습니다');
-    const proto = protos[0];
-
     const fieldsSet: Record<string, boolean> = {};
     const expectedFields: Record<string, string> = {};
-    for (const [key, name] of Object.entries(FIELD_MAP)) {
-      const value = String(ir.meta[key] ?? '');
-      fieldsSet[name] = s.setField(name, value);
-      if (fieldsSet[name]) expectedFields[name] = value;
-      else warnings.push(`양식에 누름틀 "${name}"이(가) 없어 건너뜀`);
-    }
-
-    // 3) 반복 블록: 표 단위 복제 (P3)
-    t0 = Date.now();
-    const blocks: TableRef[] = [proto];
-    for (let i = 1; i < ir.items.length; i++) blocks.push(s.cloneTableAfter(proto, blocks[i - 1]));
-    lap('clone', t0);
-
-    // 복제 후 문단 번호가 밀릴 수 있으니 표 목록을 다시 읽는다
-    const live = s.topTables();
-    if (live.length !== ir.items.length) throw new Error(`표 수 불일치: 기대 ${ir.items.length} / 실제 ${live.length}`);
-
-    // 4) 복제본별 값 채움 (P3)
-    t0 = Date.now();
+    const expectedBlocks: Expected['blocks'] = [];
+    const splitTables: number[] = [];
+    const pending: { table: number; name: string; sources: string[] }[] = [];
+    let units = 0;
+    let cloned = 0;
     let cellsSet = 0;
-    const expectedBlocks: Record<string, string>[] = [];
-    ir.items.forEach((item, i) => {
-      const map = labelCells(s, live[i]);
-      const values = blockValues(item);
-      const want: Record<string, string> = {};
-      for (const [label, value] of Object.entries(values)) {
-        const cell = map.get(label);
-        if (!cell) {
-          warnings.push(`${mdName}:${item.line} 양식에 "${label}" 라벨이 없어 건너뜀`);
-          continue;
+    const add = (
+      code: Issue['code'],
+      sev: Issue['severity'] | null,
+      path: string,
+      message: string,
+      extra: Partial<Issue> = {},
+    ) => {
+      if (sev) issues.push({ code, severity: sev, path, message, ...extra });
+    };
+
+    /** 앞서 기록한 표 번호를 보정한다: at 뒤에 표 n개가 끼어들었다 */
+    const shiftTables = (after: number, n: number) => {
+      for (const b of expectedBlocks) if (b.table > after) b.table += n;
+      for (let i = 0; i < splitTables.length; i++) if (splitTables[i] > after) splitTables[i] += n;
+      for (const p of pending) if (p.table > after) p.table += n;
+    };
+
+    const run = (
+      bindings: Binding[],
+      scopes: Scopes,
+      unit: { ref: TableRef; index: number } | null,
+      base: string,
+      unitName: string,
+    ) => {
+      bindings.forEach((b, i) => {
+        const path = `${base}[${i}]`;
+        switch (b.kind) {
+          case 'fields': {
+            for (const [data, name] of Object.entries((b.map ?? {}) as Record<string, string>)) {
+              const v = getPath(scopes, data);
+              const value = v === undefined || v === null ? '' : String(v);
+              fieldsSet[name] = s.setField(name, value);
+              if (fieldsSet[name]) expectedFields[name] = value;
+              else
+                add(
+                  'field-not-found',
+                  severity(profile.policy.onMissingField),
+                  `${path}.map.${data}`,
+                  `양식에 없는 누름틀: ${name}`,
+                  { actual: name },
+                );
+            }
+            break;
+          }
+          case 'repeat': {
+            const arr = (getPath(scopes, String(b.over)) ?? []) as Record<string, unknown>[];
+            const found = findTables(s, b.unit as Locator) ?? [];
+            if (found.length !== 1)
+              throw new Error(`${path}.unit: 반복 단위(표)를 하나로 정할 수 없음 (${found.length}개)`);
+            const proto = found[0];
+            if (arr.length === 0) {
+              if (b.onEmpty === 'keep') break;
+              add('collection-empty', 'error', `${path}.over`, `반복할 항목이 없음: ${String(b.over)}`);
+              break;
+            }
+            const before = s.topTables().length;
+            const blocks: TableRef[] = [proto.ref];
+            for (let k = 1; k < arr.length; k++) blocks.push(s.cloneTableAfter(proto.ref, blocks[k - 1]));
+            const live = s.topTables();
+            if (live.length !== before + arr.length - 1)
+              throw new Error(`표 수 불일치: 기대 ${before + arr.length - 1} / 실제 ${live.length}`);
+            if (arr.length > 1) shiftTables(proto.index, arr.length - 1);
+            units += arr.length;
+            cloned += arr.length - 1;
+            arr.forEach((item, k) => {
+              const ref = live[proto.index + k];
+              run(
+                (b.do ?? []) as Binding[],
+                [item, ...scopes],
+                { ref, index: proto.index + k },
+                `${path}.do`,
+                firstCapture(item) ?? `${String(b.over)}-${k + 1}`,
+              );
+              s.setTablePageBreak(ref, output.tablePageBreak);
+              splitTables.push(proto.index + k);
+            });
+            break;
+          }
+          case 'cells': {
+            let ref: TableRef | undefined;
+            let index = -1;
+            if (b.in) {
+              const f = findTables(s, b.in as Locator) ?? [];
+              if (f.length !== 1) throw new Error(`${path}.in: 표를 하나로 정할 수 없음 (${f.length}개)`);
+              ref = f[0].ref;
+              index = f[0].index;
+            } else if (unit) {
+              ref = unit.ref;
+              index = unit.index;
+            }
+            if (!ref) throw new Error(`${path}: cells는 in 또는 repeat 안에서만 쓸 수 있음`);
+            const lo: LabelOptions = {
+              labelColumn: b.labelColumn as number | undefined,
+              valueColumn: b.valueColumn as number | undefined,
+              value: b.value as 'right' | 'below' | undefined,
+            };
+            const lc = labelCells(s, ref, lo);
+            const map = (b.map ?? {}) as Record<string, ValueSpec>;
+            const entries: [string, string | undefined][] = [];
+            for (const [label, spec] of Object.entries(map)) {
+              if (label === '*') continue;
+              entries.push([label, resolveValue(spec, scopes)]);
+            }
+            if ('*' in map) {
+              const kv = getPath(scopes, String(map['*'])) as Record<string, string> | undefined;
+              for (const [k, v] of Object.entries(kv ?? {})) if (!(k in map)) entries.push([k, v]);
+            }
+            const want: Record<string, string> = {};
+            for (const [label, value] of entries) {
+              const cell = lc.get(label);
+              if (!cell) {
+                add(
+                  'label-not-found',
+                  severity(profile.policy.onMissingLabel),
+                  `${path}.map.${label}`,
+                  `표에 없는 라벨: ${label}`,
+                  { actual: label },
+                );
+                continue;
+              }
+              if (value === undefined) continue;
+              s.setCellText(ref, cell.idx, value);
+              want[label] = value;
+              cellsSet++;
+            }
+            if ((b.unmappedValue ?? 'clear') === 'clear') {
+              for (const [label, cell] of lc) {
+                if (!(label in want)) {
+                  s.setCellText(ref, cell.idx, '');
+                  want[label] = '';
+                }
+              }
+            }
+            // 검증 순서는 매핑 순서가 아니라 양식 안의 라벨 순서로 고정한다 (프로필 항목 순서와 무관한 결과)
+            const ordered: Record<string, string> = {};
+            for (const label of lc.keys()) if (label in want) ordered[label] = want[label];
+            expectedBlocks.push({ table: index, values: ordered, labels: lo });
+            break;
+          }
+          case 'diagrams': {
+            if (o.skipDiagrams || !unit) break;
+            const sources = (getPath(scopes, String(b.from)) ?? []) as string[];
+            if (sources.length === 0) break;
+            if (!o.renderDiagram) {
+              add('renderer-missing', severity(profile.policy.onMissingRenderer), path, '다이어그램 렌더러가 없음');
+              break;
+            }
+            pending.push({ table: unit.index, name: unitName, sources });
+            break;
+          }
         }
-        s.setCellText(live[i], cell.idx, value);
-        want[label] = value;
-        cellsSet++;
-      }
-      // 값이 없는 라벨은 양식의 안내 문구를 비운다
-      for (const [label, cell] of map) {
-        if (!(label in want)) {
-          s.setCellText(live[i], cell.idx, '');
-          want[label] = '';
-        }
-      }
-      expectedBlocks.push(want);
-    });
-    const split = o.tableSplit ?? 'cell';
-    for (const t of live) s.setTablePageBreak(t, split);
-    if (o.fitHeights !== false) s.fitTableHeights();
+      });
+    };
+
+    t0 = Date.now();
+    const scopes: Scopes = [md.data];
+    run(profile.bindings, scopes, null, 'bindings', 'doc');
+    const errs = issues.filter((x) => x.severity === 'error');
+    if (errs.length) throw new ProfileError(errs);
+    if (output.fitHeights) s.fitTableHeights();
     lap('fill', t0);
 
-    // 5) Mermaid → 그림 (P4). 뒤쪽 블록부터 넣어 앞쪽 문단 번호가 밀리지 않게 한다.
+    // 4) 다이어그램 → 그림. 뒤쪽 단위부터 넣어 앞쪽 문단 번호가 밀리지 않게 한다.
     t0 = Date.now();
     let imagesInserted = 0;
     const diagrams: ConvertReport['diagrams'] = [];
-    if (o.renderDiagram) {
-      const rendered = new Map<string, RenderedDiagram[]>();
-      for (const item of ir.items) {
-        const list: RenderedDiagram[] = [];
-        for (const [k, d] of item.diagrams.entries()) {
-          const name = `${item.id}-${k + 1}`;
-          const r = await o.renderDiagram(d.source, name);
+    if (pending.length && o.renderDiagram) {
+      const rendered: { table: number; list: RenderedDiagramEntry[] }[] = [];
+      for (const p of pending) {
+        const list: RenderedDiagramEntry[] = [];
+        for (const [k, src] of p.sources.entries()) {
+          const name = `${p.name}-${k + 1}`;
+          const r = await o.renderDiagram(src, name);
           diagrams.push({ name, ms: r.ms, widthPx: r.widthPx, heightPx: r.heightPx });
-          list.push(r);
+          list.push({ ...r, alt: p.name });
         }
-        rendered.set(item.id, list);
+        rendered.push({ table: p.table, list });
       }
-      for (let i = ir.items.length - 1; i >= 0; i--) {
-        const list = rendered.get(ir.items[i].id) ?? [];
-        for (let k = list.length - 1; k >= 0; k--) {
-          s.insertImageAfter(live[i], {
-            bytes: list[k].bytes,
-            widthPx: list[k].widthPx,
-            heightPx: list[k].heightPx,
-            alt: `${ir.items[i].id} 다이어그램`,
+      for (const r of [...rendered].sort((a, b) => b.table - a.table)) {
+        const ref = s.topTables()[r.table];
+        for (const d of [...r.list].reverse()) {
+          s.insertImageAfter(ref, {
+            bytes: d.bytes,
+            widthPx: d.widthPx,
+            heightPx: d.heightPx,
+            alt: `${d.alt} 다이어그램`,
           });
           imagesInserted++;
         }
@@ -177,35 +321,39 @@ export async function convertBytes(
     }
     lap('mermaid+images', t0);
 
-    // 6) 저장 (P5)
+    // 5) 저장
     t0 = Date.now();
     const preCounts = s.controlCounts();
+    const tableCount = s.topTables().length;
     const bytes = s.export();
     lap('export', t0);
-
     const previews: string[] = [];
     if (o.preview) for (let p = 0; p < s.pageCount(); p++) previews.push(s.renderSvg(p));
 
-    // 7) 자체 검증 (P5)
+    // 6) 자체 검증: 저장 파일을 다시 열어 확인
     t0 = Date.now();
     const expected: Expected = {
       fields: expectedFields,
       blocks: expectedBlocks,
+      tableCount,
+      splitTables,
       images: imagesInserted,
-      tableSplit: split,
+      tableSplit: output.tablePageBreak,
       preExportCounts: preCounts,
     };
     const verify = await verifyOutput(engine, bytes, expected);
     lap('verify', t0);
 
+    for (const i of issues) warnings.push(`프로필 ${i.path}: ${i.message}`);
     const report: ConvertReport = {
-      items: ir.items.length,
+      items: units,
       fieldsSet,
-      cloned: ir.items.length - 1,
+      cloned,
       cellsSet,
       imagesInserted,
       diagrams,
       warnings,
+      issues,
       pages: s.pageCount(),
       verify,
       timingsMs: timings,
@@ -214,4 +362,8 @@ export async function convertBytes(
   } finally {
     s.dispose();
   }
+}
+
+interface RenderedDiagramEntry extends RenderedDiagram {
+  alt: string;
 }

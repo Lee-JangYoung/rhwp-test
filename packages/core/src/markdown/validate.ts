@@ -1,39 +1,22 @@
-import { Ajv } from 'ajv';
-import type { ErrorObject } from 'ajv';
-import type { Ir } from './parse';
+import { Ajv, type ErrorObject } from 'ajv';
+import type { Violation } from './read';
 
-export interface Violation {
-  line: number;
-  path: string;
-  message: string;
-}
+export type { Violation } from './read';
 
-/** 스키마 검증용 데이터 (줄 번호 등 부가 정보 제외) */
-function toData(ir: Ir) {
-  return {
-    meta: ir.meta,
-    items: ir.items.map((i) => ({ id: i.id, name: i.name, fields: i.fields, flows: i.flows })),
-  };
-}
-
-/** 오류 경로 → md 줄 번호 */
-function lineOf(ir: Ir, path: string, missing?: string): number {
-  const seg = path.split('/').filter(Boolean);
-  if (seg[0] === 'meta') return ir.metaLine;
-  if (seg[0] === 'items') {
-    const item = ir.items[Number(seg[1])];
-    if (!item) return 1;
-    if (seg[2] === 'fields') {
-      const key = seg[3] ?? missing;
-      return (key && item.fieldLines[key]) || item.fieldsLine;
-    }
-    if (seg[2] === 'flows') {
-      const k = (seg[3] ?? missing) as 'main' | 'alt' | undefined;
-      return k && item.flowLines[k] ? item.flowLines[k] : item.line;
-    }
-    return item.line;
+/** JSON 포인터에 가장 가까운(긴) 접두 경로의 줄 번호 */
+function lineFor(lines: Map<string, number>, pointer: string, missing?: string): number {
+  if (missing !== undefined) {
+    const l = lines.get(`${pointer}/${missing.replace(/~/g, '~0').replace(/\//g, '~1')}`);
+    if (l) return l;
   }
-  return 1;
+  let p = pointer;
+  while (true) {
+    const l = lines.get(p);
+    if (l) return l;
+    const i = p.lastIndexOf('/');
+    if (i <= 0) return lines.get(p) ?? 1;
+    p = p.slice(0, i);
+  }
 }
 
 function describe(e: ErrorObject): string {
@@ -54,15 +37,30 @@ function describe(e: ErrorObject): string {
   }
 }
 
-export function validateIr(ir: Ir, schema: object): Violation[] {
+/**
+ * 규약(JSON Schema)을 읽은 데이터 트리에 적용한다. 구조 위반(readMarkdown)이 이미 있는 경로는 건너뛴다
+ * (구조 검증이 먼저이고 스키마는 추가 제약, 충돌하면 구조 검증 결과가 우선).
+ */
+export function validateData(
+  data: unknown,
+  schema: object,
+  lines: Map<string, number>,
+  structural: Violation[] = [],
+): Violation[] {
   const ajv = new Ajv({ allErrors: true, strict: false });
   const validate = ajv.compile(schema);
-  if (validate(toData(ir))) return [];
-  return (validate.errors ?? []).map((e) => {
+  if (validate(data)) return [];
+  const seen = new Set(structural.map((v) => v.path));
+  const out: Violation[] = [];
+  for (const e of validate.errors ?? []) {
     const missing =
       e.keyword === 'required' ? String((e.params as { missingProperty: string }).missingProperty) : undefined;
-    return { line: lineOf(ir, e.instancePath, missing), path: e.instancePath || '/', message: describe(e) };
-  });
+    const path = e.instancePath || '/';
+    const full = missing !== undefined ? `${path === '/' ? '' : path}/${missing}` : path;
+    if (seen.has(path) || seen.has(full)) continue;
+    out.push({ line: lineFor(lines, e.instancePath, missing), path, message: describe(e) });
+  }
+  return out;
 }
 
 export function formatViolations(file: string, vs: Violation[]): string {

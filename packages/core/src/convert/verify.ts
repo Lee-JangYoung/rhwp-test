@@ -1,4 +1,4 @@
-import { readBlock } from './blocks';
+import { type LabelOptions, readBlock } from './blocks';
 import type { DocumentEngine, PageBreakMode } from '../engine/types';
 
 export interface Check {
@@ -10,8 +10,12 @@ export interface Check {
 export interface Expected {
   /** 누름틀 이름 → 값 */
   fields: Record<string, string>;
-  /** 반복 블록별 "라벨 → 값" (표 순서대로) */
-  blocks: Record<string, string>[];
+  /** 값을 채운 표별 "라벨 → 값". table은 본문 표 순서(0부터) */
+  blocks: { table: number; values: Record<string, string>; labels?: LabelOptions }[];
+  /** 저장 후 본문 표의 총 개수 */
+  tableCount: number;
+  /** 쪽 나눔 설정을 기대하는 표(본문 표 순서) */
+  splitTables: number[];
   /** 본문에 들어간 그림 수 */
   images: number;
   /** 반복 블록 표에 기대하는 쪽 나눔 설정 */
@@ -64,13 +68,13 @@ export async function verifyOutput(engine: DocumentEngine, bytes: Uint8Array, ex
     const tables = s.topTables();
     checks.push({
       name: '반복 블록(표) 수',
-      ok: tables.length === exp.blocks.length,
-      detail: `기대 ${exp.blocks.length} / 실제 ${tables.length}`,
+      ok: tables.length === exp.tableCount,
+      detail: `기대 ${exp.tableCount} / 실제 ${tables.length}`,
     });
-    exp.blocks.forEach((want, i) => {
-      const t = tables[i];
+    exp.blocks.forEach(({ table, values: want, labels }, i) => {
+      const t = tables[table];
       if (!t) return;
-      const got = readBlock(s, t);
+      const got = readBlock(s, t, labels);
       for (const [label, v] of Object.entries(want)) {
         checks.push({
           name: `블록 ${i + 1} "${label}" 값`,
@@ -89,7 +93,7 @@ export async function verifyOutput(engine: DocumentEngine, bytes: Uint8Array, ex
 
     // 2-1) 표 쪽 나눔: 나누지 않음이면 쪽을 넘는 표가 다음 쪽으로 이어지지 않고 잘린다
     const tl = s.tableLayouts();
-    const badSplit = tl.filter((l) => l.pageBreak !== exp.tableSplit).length;
+    const badSplit = exp.splitTables.filter((i) => tl[i]?.pageBreak !== exp.tableSplit).length;
     checks.push({
       name: `표 쪽 나눔 = ${exp.tableSplit}`,
       ok: badSplit === 0,

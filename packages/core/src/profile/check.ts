@@ -32,6 +32,15 @@ function itemScope(name: string, def: Collection, parent: Scope): Scope {
   return sc;
 }
 
+/** JSON Schema에서 컬렉션 항목의 슬롯(객체)의 required 키 목록 */
+function requiredOf(schema: object, collection: string, slotKey: string): string[] {
+  const top = collection.split('.')[0];
+  const props = (
+    schema as { properties?: Record<string, { items?: { properties?: Record<string, { required?: string[] }> } }> }
+  ).properties;
+  return props?.[top]?.items?.properties?.[slotKey]?.required ?? [];
+}
+
 const sev = (p: Policy): Issue['severity'] | null => (p === 'ignore' ? null : p === 'warn' ? 'warning' : 'error');
 
 /**
@@ -42,7 +51,7 @@ export async function checkProfile(
   engine: DocumentEngine,
   profile: Profile,
   template: Uint8Array,
-  opts: { lineOf?: (path: string) => number | undefined } = {},
+  opts: { lineOf?: (path: string) => number | undefined; dataSchema?: object } = {},
 ): Promise<CheckResult> {
   const facts = await analyzeTemplate(engine, template);
   const issues: Issue[] = [];
@@ -65,6 +74,21 @@ export async function checkProfile(
   for (const [n, d] of Object.entries(profile.md.collections)) root.set(n, { type: 'collection', name: n, def: d });
   const usedSlots = new Set<string>();
 
+  // 같은 컬렉션 안의 이름 충돌 (캡처·슬롯·하위 컬렉션)
+  const conflicts = (name: string, def: Collection, path: string) => {
+    const seen = new Map<string, string>();
+    const claim = (n: string, what: string) => {
+      if (seen.has(n))
+        add('name-conflict', 'error', path, `이름 '${n}'이 ${seen.get(n)}과(와) ${what}에서 겹침`, { actual: n });
+      else seen.set(n, what);
+    };
+    for (const c of captures(def.heading.pattern)) claim(c, '제목 캡처');
+    for (const sl of def.slots ?? []) claim(sl.key, '슬롯');
+    for (const cn of Object.keys(def.children ?? {})) claim(cn, '하위 컬렉션');
+    for (const [cn, cd] of Object.entries(def.children ?? {})) conflicts(`${name}.${cn}`, cd, `${path}.children.${cn}`);
+  };
+  for (const [n, d] of Object.entries(profile.md.collections)) conflicts(n, d, `md.collections.${n}`);
+
   /** 데이터 경로를 해석한다. 못 찾으면 path-unknown 항목을 추가하고 null을 돌려준다. */
   const resolve = (path: string, scope: Scope, at: string): Var | null => {
     const [head, ...rest] = path.split('.');
@@ -72,7 +96,10 @@ export async function checkProfile(
     if (!v) {
       add('path-unknown', 'error', at, `데이터 경로를 찾을 수 없음: ${path}`, {
         actual: path,
-        candidates: closest(head, [...scope.keys()]),
+        candidates: closest(
+          head,
+          [...scope.keys()].filter((k) => !k.startsWith('\0')),
+        ),
       });
       return null;
     }
@@ -197,8 +224,10 @@ export async function checkProfile(
           const over = String(b.over);
           const v = scope.get(over);
           let next: Scope | null = null;
-          if (v?.type === 'collection') next = itemScope(v.name, v.def, scope);
-          else
+          if (v?.type === 'collection') {
+            next = itemScope(v.name, v.def, scope);
+            next.set('\0coll', { type: 'collection', name: v.name, def: v.def });
+          } else
             here('collection-unknown', 'error', `${path}.over`, `선언하지 않은 컬렉션: ${over}`, {
               actual: over,
               candidates: closest(
@@ -206,6 +235,8 @@ export async function checkProfile(
                 [...scope.entries()].filter(([, x]) => x.type === 'collection').map(([k]) => k),
               ),
             });
+          if (b.onEmpty === 'remove')
+            here('kind-not-supported', 'error', `${path}.onEmpty`, "onEmpty 'remove'는 아직 지원하지 않음");
           const tbl = resolveTable(b.unit as Locator, `${path}.unit`);
           if (next) walk((b.do ?? []) as Binding[], `${path}.do`, next, tbl ?? 'failed');
           break;
@@ -244,6 +275,33 @@ export async function checkProfile(
                 `매핑되지 않은 양식 라벨(값 없음으로 처리): ${miss.join(', ')}`,
                 { actual: miss },
               );
+          }
+          // md 규약(JSON Schema)의 필수 항목이 양식에 채워지는가 (kv 슬롯의 필수 키)
+          if (opts.dataSchema && tbl && scope.has('\0coll')) {
+            const cv = scope.get('\0coll') as unknown as { name: string; def: Collection };
+            for (const sl of cv.def.slots ?? []) {
+              if (sl.as !== 'kv') continue;
+              const req = requiredOf(opts.dataSchema, cv.name, sl.key);
+              for (const k of req) {
+                const mapped = k in map || ('*' in map && (map['*'] as unknown) === sl.key);
+                if (!mapped)
+                  here(
+                    'schema-required-unmapped',
+                    'warning',
+                    `${path}.map`,
+                    `규약의 필수 항목 '${k}'이(가) 매핑되지 않음`,
+                    { actual: k },
+                  );
+                else if (!labels.includes(k))
+                  here(
+                    'schema-required-unmapped',
+                    'warning',
+                    `${path}.map`,
+                    `규약의 필수 항목 '${k}'이(가) 양식 표의 라벨에 없음`,
+                    { actual: k, candidates: closest(k, labels) },
+                  );
+              }
+            }
           }
           break;
         }

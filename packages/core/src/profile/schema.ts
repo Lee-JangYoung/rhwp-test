@@ -15,7 +15,7 @@ export function buildProfileSchema(): JsonSchema {
       },
       key: str('데이터 이름(바인딩의 경로에서 쓴다)'),
       under: str('이 제목 아래의 내용만 읽는다(하위 제목 텍스트)'),
-      optional: { type: 'boolean', description: '없어도 규약 위반이 아님', default: false },
+      optional: { type: 'boolean', description: '없어도 규약 위반이 아님(기본 false, code 슬롯은 true)' },
       lang: str('as가 code일 때 코드 블록 언어(예: mermaid)'),
     },
     required: ['as', 'key'],

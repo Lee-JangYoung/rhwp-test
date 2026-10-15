@@ -3,13 +3,18 @@
  * Node 전용 기능(파일 입출력, WASM 로더, Mermaid CLI)은 `@yangsik/core/node`에 있다.
  * 0.x 동안 API는 안정적이지 않다.
  */
-export { convertBytes, ValidationError } from './convert/convert';
+export { convertBytes, ProfileError, ValidationError } from './convert/convert';
 export type { ConvertInput, ConvertReport, DiagramRenderer, RenderedDiagram } from './convert/convert';
 export { previewMapping } from './convert/mapping';
+export { testProfile } from './convert/test-profile';
+export type { ProfileTestResult } from './convert/test-profile';
 export type { MappingPreview, MappingRow } from './convert/mapping';
 export { createRhwpEngine } from './engine/rhwp';
 export type * from './engine/types';
-export { parseMarkdown } from './markdown/parse';
+export { readMarkdown } from './markdown/read';
+export type { MdRead } from './markdown/read';
+export { formatViolations, validateData } from './markdown/validate';
+export type { Violation } from './markdown/validate';
 export {
   analyzeTemplate,
   buildProfileSchema,
@@ -31,6 +36,3 @@ export type {
   Profile,
   TemplateFacts,
 } from './profile/index';
-export type { Ir } from './markdown/parse';
-export { formatViolations, validateIr } from './markdown/validate';
-export type { Violation } from './markdown/validate';

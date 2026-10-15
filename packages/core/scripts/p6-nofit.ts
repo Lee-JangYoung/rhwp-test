@@ -6,10 +6,9 @@ import { convert, rhwpEngine } from '../src/node/index';
 const at = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 const r = await convert(rhwpEngine, {
   mdPath: at('../../../templates/usecase/example.md'),
-  templatePath: process.argv[2] ?? at('../../../templates/usecase/template.hwpx'),
+  profilePath: process.argv[2] ?? at('../../../templates/usecase/profile.yaml'),
   outPath: process.argv[3] ?? at('../../../out/p6/5-표높이맞춤없음-비교용.hwpx'),
-  schemaPath: at('../../../templates/usecase/schema.json'),
-  fitHeights: false,
+  output: { fitHeights: false },
   workDir: at('../../../out/work'),
 });
 console.log('출력:', r.out, `(${r.pages}쪽)`, r.verify.ok ? '검증 통과' : '자체 검증 실패 (의도됨: 낡은 표 높이)');
