@@ -11,12 +11,12 @@
 | pnpm 워크스페이스, Node 24, 도구 설정, `packages/core`·`packages/cli` 빈 뼈대, 스모크 시험 1개씩, CI | PoC 코드 이식(I-1), 프로필(I-2), `packages/mcp`·`web`(I-7·I-8) |
 
 ## 작업
-1. **루트**: `package.json`(`private`, `packageManager: pnpm@12.11.2`, `engines.node >=24`), `pnpm-workspace.yaml`(`packages/*`, 의존성 `catalog:`로 정확 버전 고정, 빌드 스크립트 허용 목록 `esbuild`·`puppeteer`), `.nvmrc`(24), `.npmrc`(`PUPPETEER_SKIP_DOWNLOAD`는 설치 환경에서 설정), `tsconfig.base.json`(strict, ESM, Bundler 해석), `.gitignore` 보강.
+1. **루트**: `package.json`(`private`, `packageManager: pnpm@12.11.2`, `engines.node >=24`), `pnpm-workspace.yaml`(`packages/*`, 의존성 `catalog:`로 정확 버전 고정, 빌드 스크립트 허용 목록은 `esbuild`·`puppeteer`가 들어오는 I-1·I-4에서 추가), `.nvmrc`(24), `.npmrc`(`PUPPETEER_SKIP_DOWNLOAD`는 설치 환경에서 설정), `tsconfig.base.json`(strict, ESM, Bundler 해석), `.gitignore` 보강.
 2. **패키지 뼈대**: `packages/core`, `packages/cli` — `package.json`, `tsconfig.json`, `src/index.ts`(자리표시), `test/smoke.test.ts` 1개. `cli`는 `core`를 `workspace:*`로 참조.
 3. **스크립트(루트)**: `typecheck`, `lint`, `format`, `test`(vitest, **`poc/web/e2e` 제외**), `build`.
 4. **도구 설정**: 린트·포맷 설정 파일(D1), vitest 설정.
 5. **CI**(D2): PR마다 설치(`--frozen-lockfile`) → typecheck → lint → test.
-6. **암묵 의존성 정리**: `@types/mdast` 등 pnpm이 드러낸 누락을 명시([S-24](../06-quality/verification-spike.md)).
+6. **암묵 의존성 정리**: `@types/mdast` 등 pnpm이 드러낸 누락은 해당 코드가 이식되는 I-1에서 명시한다([S-24](../06-quality/verification-spike.md)). `poc/`는 변경하지 않는다.
 7. **문서**: 결정 결과를 ADR-0015로 기록, README의 구성 표 갱신, `LICENSE`(MIT) 추가.
 
 ## 완료 기준
@@ -33,6 +33,11 @@
 | D3 | 제품·패키지 이름 | **`yangsik`** → `@yangsik/core`, `@yangsik/cli` (미배포) | `md2hwpx`는 GitHub에 같은 이름 저장소가 다수(6건 이상), `sidoc`은 56건. `yangsik`은 npm 미사용(404), GitHub `yangsik hwpx` 검색 0건. npm 스코프 `@yangsik` 사용 가능 여부는 미확인 |
 | D4 | 라이선스 | **MIT** | 사용자 결정. 저작권 표기는 저장소 소유자(`Lee-JangYoung`)로 적음. 패키지는 배포 결정 전까지 `private: true`. 웹 번들에 rhwp(MIT)·mermaid(MIT) 등을 포함해 배포할 때의 고지 방식은 웹 단계에서 확인 [검증 필요] |
 | D5 | `poc/` | **I-1 이식이 끝날 때까지 유지, 이후 삭제** | 이식 중 동작 비교 기준, 결과 기록은 `_spec`에 있음 |
+
+## 구현 결과 (2026-10-15)
+- 추가: 루트 `package.json`·`pnpm-workspace.yaml`(catalog 고정)·`.nvmrc`·`tsconfig.base.json`·`biome.json`·`vitest.config.ts`·`LICENSE`·`.gitignore`, `packages/core`·`packages/cli` 뼈대와 스모크 시험, `.github/workflows/ci.yml`.
+- CI는 `pnpm/action-setup` 대신 `packageManager` 값을 읽어 `npm install -g pnpm@…`로 설치한다. 액션은 `actions/checkout@v4`, `actions/setup-node@v4`이며 **최신 버전은 확인하지 못했다** [검증 필요] (이 세션에서 해당 저장소를 읽을 수 없음).
+- Biome `biome migrate`가 `recommended: true`를 `preset: "none"`(규칙 꺼짐)으로 바꾸므로 `preset: "recommended"`로 직접 지정했다(위반 예시로 규칙 동작 확인).
 
 ## 위험
 - pnpm 12는 빌드 스크립트 허용 설정 없이 설치가 중단된다(S-24). 설정으로 해결하며, CI에서 같은 조건으로 검증한다.

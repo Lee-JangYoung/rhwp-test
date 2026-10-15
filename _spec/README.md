@@ -5,9 +5,9 @@
 ## 구성
 
 ```
-poc/             # (있음) 가능성 확인용 TypeScript PoC: CLI·웹(React)·시험. 제품 코드 아님
-packages/core    # (계획) 양식 분석, 프로필, md → IR → 엔진 인터페이스. Node/브라우저 공통
-packages/cli     # (계획) md2hwp
+poc/             # (있음) 가능성 확인용 TypeScript PoC: CLI·웹(React)·시험. 제품 코드 아님. I-1 이식 후 삭제
+packages/core    # (뼈대만, I-0) @yangsik/core — 양식 분석, 프로필, md → IR → 엔진 인터페이스. Node/브라우저 공통
+packages/cli     # (뼈대만, I-0) @yangsik/cli
 packages/mcp     # (계획) LLM 에이전트용 MCP 서버
 packages/web     # (계획) Vite + React + MUI 웹 UI (후순위)
 templates/<유형>/ # (계획) 문서 유형 프로필: 양식(HWPX) + template.md + schema.json + profile.yaml + prompt.md
