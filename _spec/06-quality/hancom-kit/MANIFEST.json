@@ -1,0 +1,70 @@
+{
+  "rhwp": "0.8.7",
+  "mermaidRendered": true,
+  "generatedBy": "pnpm --filter @yangsik/core kit:hancom",
+  "files": [
+    {
+      "file": "files/01-유스케이스-기본.hwpx",
+      "title": "유스케이스 기본(표 3개 복제, Mermaid 그림)",
+      "sha256": "908d075fc4ef58261fa46670e27c125b9905bcc336bb6d0d5e2a8efefead9871",
+      "pages": 2,
+      "selfVerify": true,
+      "failedChecks": [],
+      "nonStandardEntry": true
+    },
+    {
+      "file": "files/02-유스케이스-긴표.hwpx",
+      "title": "유스케이스 긴 표(쪽 경계, 떠 있는 표)",
+      "sha256": "1d853d45e9bf5b09d9badc57c545d24dd3c3df1c629adbaff146b0d8f7bf07f0",
+      "pages": 3,
+      "selfVerify": true,
+      "failedChecks": [],
+      "nonStandardEntry": true
+    },
+    {
+      "file": "files/03-유스케이스-표높이맞춤없음-비교용.hwpx",
+      "title": "표 높이 맞춤을 끈 비교용(의도적으로 낡은 표 높이)",
+      "sha256": "2382d3d35621680fc2b809ebeebbc7c3e86d058e8cb53ca18289281f5190f7e0",
+      "pages": 2,
+      "selfVerify": false,
+      "failedChecks": ["표 저장 높이가 렌더 높이 이상"],
+      "nonStandardEntry": true
+    },
+    {
+      "file": "files/04-유스케이스-글자처럼취급표.hwpx",
+      "title": "표를 \"글자처럼 취급\"으로 만든 양식(긴 표)",
+      "sha256": "bce1417c3543e878ed8c69777b67274706de752567d39dda0cf4d0e663a8189a",
+      "pages": 1,
+      "selfVerify": true,
+      "failedChecks": [],
+      "nonStandardEntry": true
+    },
+    {
+      "file": "files/05-클래스명세서.hwpx",
+      "title": "클래스 명세서(표 묶음 복제, 행 목록, 중첩 반복, 표 삭제)",
+      "sha256": "3a4b567efae68ed188d6fe7da37e3a3374986592c17662a7dc602ccd4461fc08",
+      "pages": 2,
+      "selfVerify": true,
+      "failedChecks": [],
+      "nonStandardEntry": true
+    },
+    {
+      "file": "files/06-DB명세서.hwpx",
+      "title": "DB 명세서(행·표 삭제)",
+      "sha256": "3cd40fef5c43b646130df825180f160eede25f4e3925495f2137cc061d709f51",
+      "pages": 1,
+      "selfVerify": true,
+      "failedChecks": [],
+      "nonStandardEntry": true
+    },
+    {
+      "file": "files/07-보고서-토큰문단.hwpx",
+      "title": "보고서(토큰 치환, 표식 문단을 목록으로 전개)",
+      "sha256": "a1b3d3304fd5649f58364804472aef9572944d5981f36647cf41ac849bd8c09a",
+      "pages": 1,
+      "selfVerify": true,
+      "failedChecks": [],
+      "nonStandardEntry": true
+    }
+  ]
+}

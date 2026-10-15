@@ -13,7 +13,8 @@
     "gen:schema": "tsx scripts/gen-profile-schema.ts",
     "gen:docs": "tsx scripts/gen-profile-docs.ts",
     "gen:templates": "tsx scripts/make-templates.ts",
-    "gen:profiles": "tsx scripts/write-example-profiles.ts"
+    "gen:profiles": "tsx scripts/write-example-profiles.ts",
+    "kit:hancom": "tsx scripts/hancom-kit.ts"
   },
   "dependencies": {
     "@rhwp/core": "catalog:",
