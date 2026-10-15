@@ -1,97 +1,67 @@
-import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
-import { formatViolations, ProfileError, readMarkdown, ValidationError, validateData } from '@yangsik/core';
-import { convert, findChromium, loadProfileFile, rhwpEngine } from '@yangsik/core/node';
+import { convertCmd, convertOptions } from './commands/convert';
+import { doctor } from './commands/doctor';
+import { profileCmd, profileOptions, type ProfileValues } from './commands/profile';
+import { validate, validateOptions } from './commands/validate';
+import { EXIT, Out, UsageError } from './util';
 
-// 명령 체계는 I-4에서 재설계한다. 지금은 프로필(--profile)로 구동하는 최소 명령만 둔다.
-const { positionals, values } = parseArgs({
-  allowPositionals: true,
-  options: {
-    md: { type: 'string' },
-    profile: { type: 'string' },
-    template: { type: 'string' },
-    out: { type: 'string' },
-    preview: { type: 'string' },
-    'no-mermaid': { type: 'boolean' },
-    json: { type: 'boolean' },
-  },
-});
+const HELP = `yangsik — Markdown → 양식 HWPX 변환
 
-const cmd = positionals[0];
+  yangsik doctor                                  환경 점검
+  yangsik convert <md...> -p <profile> [-o 출력] [--report f] [--preview dir] [--no-mermaid] [--strict] [--json]
+  yangsik validate <md...> -p <profile> [--strict] [--json]
+  yangsik profile check <profile> [--strict] [--json]
+  yangsik profile test <profile> [--md 예제.md] [--no-mermaid] [--json]
+  yangsik profile analyze <양식.hwpx>             양식 사실 JSON
+  yangsik profile kinds [--all] | guide [주제] | schema
+  yangsik profile generate --template 양식.hwpx --example-md 예제.md --provider <anthropic|openai|ollama> --model <id> --allow-send [--out 폴더]
+                           (--print-prompt: 전송 내용만 보여 주고 종료)
 
-async function main(): Promise<number> {
-  switch (cmd) {
-    case 'check': {
-      const s = await rhwpEngine.open();
-      console.log(`rhwp ${rhwpEngine.version} 로드 OK, 빈 문서 쪽수 ${s.pageCount()}, 스타일 ${s.analyze().styles}개`);
-      s.dispose();
-      console.log(`Chromium: ${findChromium() ?? '없음 (Mermaid 불가)'}`);
-      return 0;
-    }
-    case 'validate': {
-      if (!values.md || !values.profile) throw new Error('--md --profile 필요');
-      const loaded = loadProfileFile(values.profile);
-      if (!loaded.profile) throw new ProfileError(loaded.issues);
-      const md = readMarkdown(loaded.profile, readFileSync(values.md, 'utf8'));
-      const schema = loaded.schemaPath ? (JSON.parse(readFileSync(loaded.schemaPath, 'utf8')) as object) : undefined;
-      const vs = [...md.violations, ...(schema ? validateData(md.data, schema, md.lines, md.violations) : [])].sort(
-        (a, b) => a.line - b.line,
-      );
-      if (vs.length) {
-        console.error(formatViolations(values.md, vs));
-        return 1;
+종료 코드: 0 성공 · 1 입력/설정 오류 · 2 변환은 했으나 자체 검증 실패 · 3 예기치 못한 오류 · 4 --strict에서 경고
+`;
+
+async function main(argv: string[]): Promise<number> {
+  const [cmd, ...rest] = argv;
+  if (!cmd || cmd === '-h' || cmd === '--help' || cmd === 'help') {
+    console.log(HELP);
+    return cmd ? EXIT.ok : EXIT.input;
+  }
+  try {
+    switch (cmd) {
+      case 'doctor': {
+        const { values } = parseArgs({ args: rest, options: { json: { type: 'boolean' } } });
+        return await doctor(rest, new Out(!!values.json));
       }
-      console.log(`OK: 경고 ${md.warnings.length}건`);
-      return 0;
-    }
-    case 'analyze': {
-      if (!values.template) throw new Error('--template 필요');
-      const s = await rhwpEngine.open(new Uint8Array(readFileSync(values.template)));
-      console.log(JSON.stringify(s.analyze(), null, 2));
-      s.dispose();
-      return 0;
-    }
-    case 'convert': {
-      if (!values.md || !values.profile || !values.out) throw new Error('--md --profile --out 필요');
-      try {
-        const r = await convert(rhwpEngine, {
-          mdPath: values.md,
-          profilePath: values.profile,
-          outPath: values.out,
-          skipMermaid: values['no-mermaid'],
-          previewDir: values.preview,
-        });
-        if (values.json) console.log(JSON.stringify(r, null, 2));
-        else {
-          console.log(
-            `출력: ${r.out}  (${r.pages}쪽, 항목 ${r.items}건, 복제 ${r.cloned}, 셀 ${r.cellsSet}, 그림 ${r.imagesInserted})`,
-          );
-          for (const c of r.verify.checks)
-            console.log(`  ${c.ok ? '✔' : '✘'} ${c.name}${c.detail ? ` — ${c.detail}` : ''}`);
-          for (const w of r.warnings) console.log(`  ⚠ ${w}`);
-          console.log(`  시간(ms): ${JSON.stringify(r.timingsMs)}`);
-        }
-        return r.verify.ok ? 0 : 2;
-      } catch (e) {
-        if (e instanceof ValidationError || e instanceof ProfileError) {
-          console.error(e.message);
-          return 1;
-        }
-        throw e;
+      case 'convert': {
+        const { positionals, values } = parseArgs({ args: rest, allowPositionals: true, options: convertOptions });
+        return await convertCmd(positionals, values, new Out(!!values.json));
       }
+      case 'validate': {
+        const { positionals, values } = parseArgs({ args: rest, allowPositionals: true, options: validateOptions });
+        return await validate(positionals, values, new Out(!!values.json));
+      }
+      case 'profile': {
+        const { positionals, values } = parseArgs({ args: rest, allowPositionals: true, options: profileOptions });
+        const [sub, ...args] = positionals;
+        return await profileCmd(sub, args, values as ProfileValues, new Out(!!values.json));
+      }
+      default:
+        console.error(`알 수 없는 명령: ${cmd}\n\n${HELP}`);
+        return EXIT.input;
     }
-    default:
-      console.error(
-        '사용법: yangsik <check|validate|analyze|convert> [--profile f] [--md f] [--template f] [--out f] [--preview dir] [--no-mermaid] [--json]',
-      );
-      return 1;
+  } catch (e) {
+    if (e instanceof UsageError || (e as { code?: string }).code?.startsWith('ERR_PARSE_ARGS')) {
+      console.error((e as Error).message);
+      return EXIT.input;
+    }
+    throw e;
   }
 }
 
-main().then(
+main(process.argv.slice(2)).then(
   (code) => process.exit(code),
   (e) => {
     console.error(e);
-    process.exit(3);
+    process.exit(EXIT.internal);
   },
 );

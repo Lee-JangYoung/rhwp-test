@@ -68,6 +68,7 @@ export function buildUserPrompt(i: UserPromptInput): string {
     `## 양식 사실 (JSON)\n\`\`\`json\n${JSON.stringify(i.facts, null, 1)}\n\`\`\``,
     `## 예제 md\n\`\`\`markdown\n${i.exampleMd}\n\`\`\``,
     ...(i.dataSchema ? [`## md 규약 (JSON Schema)\n\`\`\`json\n${JSON.stringify(i.dataSchema, null, 1)}\n\`\`\``] : []),
+    `프로필의 template은 "template.hwpx"${i.dataSchema ? ', schema는 "schema.json"' : ''}로 씁니다(프로필 폴더에 그 이름으로 복사됩니다).`,
     '위 양식에 예제 md를 넣는 프로필을 작성하세요. 프로필과 근거(rationale)를 함께 냅니다.',
   ];
   if (i.textOnly)

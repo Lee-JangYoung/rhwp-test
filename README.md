@@ -11,9 +11,8 @@ Node 24 LTS, pnpm 12.11.2(`packageManager` 필드)가 필요하다.
 ```bash
 pnpm install
 pnpm check                       # typecheck + lint + format + test
-pnpm --filter @yangsik/cli start -- check
-pnpm --filter @yangsik/cli start -- convert \
-  --profile templates/usecase/profile.yaml --md templates/usecase/example.md --out out/usecase.hwpx
+pnpm yangsik doctor
+pnpm yangsik convert templates/usecase/example.md -p templates/usecase/profile.yaml -o out/usecase.hwpx
 pnpm --filter @yangsik/web dev   # 웹 PoC (http://127.0.0.1:5173)
 pnpm --filter @yangsik/web test:e2e
 ```

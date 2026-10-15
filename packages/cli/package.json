@@ -6,13 +6,17 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "start": "tsx src/cli.ts"
+    "start": "node bin/yangsik.mjs"
   },
   "dependencies": {
     "@mermaid-js/mermaid-cli": "catalog:",
-    "@yangsik/core": "workspace:*"
-  },
-  "devDependencies": {
+    "@yangsik/core": "workspace:*",
     "tsx": "catalog:"
+  },
+  "bin": {
+    "yangsik": "./bin/yangsik.mjs"
+  },
+  "optionalDependencies": {
+    "@yangsik/author": "workspace:*"
   }
 }

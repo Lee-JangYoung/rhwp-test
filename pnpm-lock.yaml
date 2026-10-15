@@ -278,10 +278,13 @@ importers:
       '@yangsik/core':
         specifier: workspace:*
         version: link:../core
-    devDependencies:
       tsx:
         specifier: 'catalog:'
         version: 4.23.15
+    optionalDependencies:
+      '@yangsik/author':
+        specifier: workspace:*
+        version: link:../author
 
   packages/core:
     dependencies:

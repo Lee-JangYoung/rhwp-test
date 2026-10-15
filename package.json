@@ -14,7 +14,8 @@
     "format:check": "biome format .",
     "test": "vitest run",
     "build": "pnpm -r build",
-    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test"
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test",
+    "yangsik": "node packages/cli/bin/yangsik.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
