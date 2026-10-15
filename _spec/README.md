@@ -47,6 +47,7 @@ templates/<유형>/ # (계획) 문서 유형 프로필: 양식(HWPX) + template.
 | CLI / MCP / 웹 UI | [05-interfaces/](05-interfaces/) |
 | 검증 상태 (단일 출처) | [06-quality/verification-spike.md](06-quality/verification-spike.md) |
 | 단계 계획, 후순위 메모, 미결 사항 | [roadmap.md](roadmap.md) |
+| 구현 단계별 계획·결정 사항 | [07-implementation/](07-implementation/) |
 
 ## 작성 규칙
 - 한국어로 쓰고 코드·식별자는 영어 그대로 둔다.
