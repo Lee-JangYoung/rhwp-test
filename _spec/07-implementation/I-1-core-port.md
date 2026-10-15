@@ -42,15 +42,15 @@ PoC(`poc/src`)의 변환 코어를 `packages/core`로 옮기고 Node 전용 코�
 | D1 | Node 전용 코드의 위치 | `@yangsik/core`의 `node/` 폴더(하위 경로 `@yangsik/core/node`). 코어는 기능별 폴더(`engine/`, `markdown/`, `convert/`, `node/`)로 구분한다. Mermaid CLI(`@mermaid-js/mermaid-cli`)는 core의 선택적 peer 의존성으로 두어 브라우저 소비자(web)에 설치되지 않게 하고, cli가 의존한다 |
 | D2 | 공개 API | 최소 범위(권장안). `convertBytes`, 입출력 타입, `ValidationError`, `createRhwpEngine`, 엔진 인터페이스, `parseMarkdown`, `validate`. 웹 PoC가 쓰던 매핑 미리보기(`previewMapping`)는 `web`에 두지 않고 core로 옮겨 함께 공개한다(동작 동일, 코드 이동) |
 | D3 | 샘플 자료 위치 | 루트 `templates/usecase/`(`schema.json`, `template.hwpx`, `example.md`, `fixtures/`) |
-| D4 | `poc/` 처리 | **전체 이전 후 삭제**: 코어·CLI·시험·스크립트는 `packages/core`·`cli`로, 웹 PoC는 `packages/web`으로(import를 `@yangsik/core`로 변경, Playwright W1~W8 유지) 옮긴 뒤 `poc/`를 삭제한다. 삭제 전 태그 `poc-final`을 남긴다 |
+| D4 | `poc/` 처리 | **전체 이전 후 삭제**: 코어·CLI·시험·스크립트는 `packages/core`·`cli`로, 웹 PoC는 `packages/web`으로(import를 `@yangsik/core`로 변경, Playwright W1~W8 유지) 옮긴 뒤 `poc/`를 삭제한다. 삭제 전 보관 브랜치 `archive/poc-final`을 남긴다 |
 | D5 | 빌드 | I-1에서는 빌드 없이 TS 소스 노출, CLI는 `tsx` 실행. 빌드는 I-4 |
 | D6 | 출력 비교 | 일회성 스크립트로 PoC와 이식본을 비교하고 결과만 기록 |
 
 ## 구현 결과 (2026-10-15)
-- 이식: `core`는 `engine/`·`markdown/`·`convert/`·`node/` 폴더, `cli`는 `cli.ts`, `web`은 PoC 웹을 `@yangsik/core` 기반으로 이전, 샘플은 `templates/usecase/`. `poc/`는 삭제했고 이식 전 상태는 태그 `poc-final`(`285b8a3`)로 남겼다.
+- 이식: `core`는 `engine/`·`markdown/`·`convert/`·`node/` 폴더, `cli`는 `cli.ts`, `web`은 PoC 웹을 `@yangsik/core` 기반으로 이전, 샘플은 `templates/usecase/`. `poc/`는 삭제했고 이식 전 상태는 보관 브랜치 `archive/poc-final`(`285b8a3`)로 남겼다.
 - 공개 API(`@yangsik/core`): `convertBytes`, `ValidationError`, `createRhwpEngine`, `previewMapping`, `parseMarkdown`, `validateIr`, `formatViolations`와 타입. 시험으로 범위를 고정했다. `@yangsik/core/node`: `convert`, `rhwpEngine`, `ensureRhwp`, `createBlankDoc`, `renderMermaid`, `findChromium`.
 - 시험: vitest 13개(이식 10 + 환경 독립 2 + cli 1), Playwright 3개(W1~W8), 웹 빌드. Chromium이 있을 때 Mermaid 시험도 통과.
-- **PoC와 출력 비교(D6)**: `usecase-ok`·`usecase-long`을 PoC(`poc-final`)와 이식본 CLI로 변환해 비교했다. 변환 보고(타이밍·출력 경로 제외)가 같고, **HWPX의 모든 ZIP 항목이 바이트 단위로 동일**했다(`section0.xml` 포함).
+- **PoC와 출력 비교(D6)**: `usecase-ok`·`usecase-long`을 PoC(`archive/poc-final`)와 이식본 CLI로 변환해 비교했다. 변환 보고(타이밍·출력 경로 제외)가 같고, **HWPX의 모든 ZIP 항목이 바이트 단위로 동일**했다(`section0.xml` 포함).
 - Mermaid CLI는 `@mermaid-js/mermaid-cli`를 core의 선택적 peer 의존성으로 두고 `cli`가 의존한다. 실행 파일은 패키지 진입점과 같은 폴더의 `cli.js`로 찾아 `node`로 실행한다(`.bin` 경로에 의존하지 않음).
 - pnpm 12: `allowBuilds`(`esbuild`, `puppeteer` 거부)를 `pnpm approve-builds '!esbuild' '!puppeteer'`로 기록했다. 또 공급망 정책(`minimumReleaseAge`)이 최근 24시간 이내 배포 버전을 막아, `react`·`react-dom`·`@playwright/test`의 현재 고정 버전(2026-10-14 배포)은 정확한 버전으로 예외(`minimumReleaseAgeExclude`)를 두었다. React는 같은 날 19.0~19.3 패치가 함께 나와 보안 수정일 가능성이 있다 [검증 필요].
 - Biome: 오류 13건(반복 콜백 반환값, 식 안 대입, 미사용 import, 버튼 `type`)은 동작 변경 없이 고쳤다. 경고 7건(`!` 단언)은 남겨 두었다.
