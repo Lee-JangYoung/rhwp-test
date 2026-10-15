@@ -26,11 +26,12 @@ pnpm --filter @yangsik/web test:e2e
 |---|---|
 | `packages/core` | `@yangsik/core` — 환경 독립 변환 코어. Node 전용은 `@yangsik/core/node` |
 | `packages/author` | `@yangsik/author` — 양식 등록 단계의 LLM 연결(프로필 생성·검토), LangChain 기반 |
+| `apps/cli` | `@yangsik/cli` — 명령줄 |
+| `apps/mcp` | `@yangsik/mcp` — MCP 서버(stdio): 프로필 작성·검증·변환 도구 12개 |
+| `apps/web` | `@yangsik/web` — React + MUI 웹 UI(`@rhwp/editor` 임베드, 변환은 브라우저 안) |
 | `templates/` | 문서 유형 폴더(프로필·합성 양식·규약·예제): usecase, class-spec, db-spec, report |
-| `packages/mcp` | `@yangsik/mcp` — MCP 서버(stdio): 프로필 작성·검증·변환 도구 12개 |
-| `packages/cli` | `@yangsik/cli` — 명령줄 |
-| `packages/web` | `@yangsik/web` — React + MUI 웹 UI(`@rhwp/editor` 임베드, 변환은 브라우저 안) |
-| `templates/usecase` | 첫 문서 유형 자료(스키마·합성 양식·예제 md) |
+| `tools/` | 개발 도구: 스키마·문서·양식·예제 프로필 생성기, 한컴 확인 키트 생성기 (`pnpm gen:*`, `pnpm kit:hancom`) |
+| `kit/hancom/` | 한컴에서 열어 볼 확인 키트 산출물([README](kit/hancom/README.md)) |
 
 ## 라이선스
 MIT

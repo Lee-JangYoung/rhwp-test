@@ -10,7 +10,7 @@
    - LLM: `yangsik profile generate --template … --example-md … --print-prompt`로 전송 내용을 확인한 뒤 `--allow-send`로 생성(키는 환경변수). 결과 `profile.yaml`·`review.md`.
    - 직접: `yangsik profile guide patterns`와 `templates/class-spec`·`db-spec`의 프로필을 참고해 작성.
 4. **점검·드라이런** `yangsik profile check templates/<유형>/profile.yaml` → 오류(`code`·`path`·`후보`)를 고친다. 통과하면 `yangsik profile test templates/<유형>/profile.yaml`로 예제 md를 변환해 매핑 대조표와 자체 검증을 본다.
-5. **사람의 확인** 변환 결과를 `--preview`의 쪽별 SVG와 한컴에서 열어 확인한다(키트: [hancom-kit](../06-quality/hancom-kit/README.md)). 결과 모양이 다르면 프로필의 `output`·`policy`와 양식(표 높이·쪽 나눔)을 조정한다.
+5. **사람의 확인** 변환 결과를 `--preview`의 쪽별 SVG와 한컴에서 열어 확인한다(키트: [hancom-kit](../../kit/hancom/README.md)). 결과 모양이 다르면 프로필의 `output`·`policy`와 양식(표 높이·쪽 나눔)을 조정한다.
 6. **커밋** 양식·예제·프로필(·규약)을 `main`에 커밋한다. 프로필이 바뀌는 규칙은 `version`으로 관리한다.
 
 한계와 미검증: 실제 SI 양식의 병합 셀·다단 머리행, 표 사이 문단 복제는 아직 검증하지 않았다([known-limitations](../03-rhwp-reference/known-limitations.md) L-20·L-22). 그런 양식은 분석 결과를 개발자에게 보내 새 kind·위치 지정을 등록한다(ADR-0016).

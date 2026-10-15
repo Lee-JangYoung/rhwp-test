@@ -14,7 +14,7 @@ import {
 } from '../src/index';
 import { CLASS_SPEC, DB_SPEC, KINDS, MINIMAL_USECASE } from '../src/profile/kinds';
 import { loadProfileFile, rhwpEngine } from '../src/node/index';
-import { profileReferenceMarkdown } from '../scripts/profile-docs';
+import { profileReferenceMarkdown } from '../../../tools/profile-docs';
 
 const at = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 const USECASE_PROFILE = at('../../../templates/usecase/profile.yaml');
@@ -48,7 +48,7 @@ describe('프로필 로드·스키마', () => {
     });
   });
 
-  it('저장소의 클래스·DB 명세서 프로필 파일이 등록부의 예제와 같다 (pnpm --filter @yangsik/core gen:profiles)', () => {
+  it('저장소의 클래스·DB 명세서 프로필 파일이 등록부의 예제와 같다 (pnpm gen:profiles)', () => {
     expect(readFileSync(at('../../../templates/class-spec/profile.yaml'), 'utf8')).toBe(CLASS_SPEC);
     expect(readFileSync(at('../../../templates/db-spec/profile.yaml'), 'utf8')).toBe(DB_SPEC);
   });
@@ -70,7 +70,7 @@ describe('프로필 로드·스키마', () => {
     expect(l.issues[0].path).toBe('template');
   });
 
-  it('저장된 profile.schema.json이 등록부에서 생성한 결과와 같다 (pnpm --filter @yangsik/core gen:schema)', () => {
+  it('저장된 profile.schema.json이 등록부에서 생성한 결과와 같다 (pnpm gen:schema)', () => {
     const saved = JSON.parse(readFileSync(at('../schema/profile.schema.json'), 'utf8'));
     expect(saved).toEqual(JSON.parse(JSON.stringify(buildProfileSchema())));
   });
@@ -294,7 +294,7 @@ describe('양식 분석(LLM 입력)·kind 목록·가이드', () => {
     expect(getProfileGuide('patterns').markdown).toContain(DB_SPEC.trimEnd());
   });
 
-  it('프로필 레퍼런스 문서(_spec/04-conversion/profile-reference.md)가 생성 결과와 같다 (pnpm --filter @yangsik/core gen:docs)', () => {
+  it('프로필 레퍼런스 문서(_spec/04-conversion/profile-reference.md)가 생성 결과와 같다 (pnpm gen:docs)', () => {
     expect(readFileSync(at('../../../_spec/04-conversion/profile-reference.md'), 'utf8')).toBe(
       profileReferenceMarkdown(),
     );

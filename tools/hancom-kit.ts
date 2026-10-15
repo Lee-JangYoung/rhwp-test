@@ -1,15 +1,15 @@
 // 한컴 확인 키트(S-23): 한컴 환경에서 사람이 열어 볼 산출물, 점검표, 결과 기록 양식을 out/hancom-kit/에 만든다.
-//   pnpm --filter @yangsik/core kit:hancom
+//   pnpm kit:hancom
 // 이 환경에는 한컴이 없어 결과는 사람이 RESULT.md에 기록하고 verification-spike.md(S-23)에 옮긴다.
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { convertBytes } from '../src/index';
-import { findChromium, loadProfileFile, renderMermaid, rhwpEngine } from '../src/node/index';
+import { convertBytes } from '@yangsik/core';
+import { findChromium, loadProfileFile, renderMermaid, rhwpEngine } from '@yangsik/core/node';
 
-const root = (p: string) => fileURLToPath(new URL(`../../../${p}`, import.meta.url));
+const root = (p: string) => fileURLToPath(new URL(`../${p}`, import.meta.url));
 const OUT = process.argv[2] ?? root('out/hancom-kit');
 const work = join(OUT, '.work');
 mkdirSync(join(OUT, 'files'), { recursive: true });
@@ -28,8 +28,8 @@ type Job = {
 };
 
 const inline = join(work, 'usecase-inline.hwpx');
-execFileSync('npx', ['tsx', 'scripts/make-template.ts', inline], {
-  cwd: root('packages/core'),
+execFileSync('npx', ['tsx', 'make-templates.ts', inline], {
+  cwd: root('tools'),
   env: { ...process.env, TABLE_INLINE: '1' },
   stdio: 'ignore',
 });
@@ -166,7 +166,7 @@ writeFileSync(
     {
       rhwp: rhwpEngine.version,
       mermaidRendered: hasChromium,
-      generatedBy: 'pnpm --filter @yangsik/core kit:hancom',
+      generatedBy: 'pnpm kit:hancom',
       files: manifest,
     },
     null,

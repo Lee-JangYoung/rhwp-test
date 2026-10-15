@@ -1,6 +1,6 @@
 /**
  * 실제 LLM 스파이크 (키가 있는 개발자 PC에서 실행, CI 제외).
- *   pnpm --filter @yangsik/author spike -- <provider> <model> [A|B|C]
+ *   pnpm author:spike -- <provider> <model> [A|B|C]
  *   provider: anthropic | openai | ollama  (해당 @langchain/* 패키지를 먼저 설치: pnpm add -D --filter @yangsik/author @langchain/anthropic)
  * 키는 환경변수(ANTHROPIC_API_KEY, OPENAI_API_KEY)로만 준다. 전송 내용은 합성 유스케이스 양식과 예제 md뿐이다.
  * 결과는 out/spike/<provider>-<model>/ 에 저장되고, 표를 verification-spike.md에 옮겨 적는다.
@@ -8,7 +8,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { rhwpEngine } from '@yangsik/core/node';
-import { type Capability, generateProfile, langChainClient, reviewToMarkdown } from '../src/index';
+import { type Capability, generateProfile, langChainClient, reviewToMarkdown } from '@yangsik/author';
 
 const [provider, model, cap = 'A'] = process.argv.slice(2).filter((a) => a !== '--');
 if (!provider || !model) {
@@ -28,7 +28,7 @@ const mod = (await import(pkg).catch(() => {
 })) as Record<string, new (o: object) => never>;
 const chat = new mod[cls]({ model }) as never;
 
-const root = join(import.meta.dirname, '../../../templates/usecase');
+const root = join(import.meta.dirname, '../templates/usecase');
 const rows: [string, string][] = [];
 const probe = async (name: string, f: () => Promise<string>) => {
   try {

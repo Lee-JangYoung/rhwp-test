@@ -1,5 +1,7 @@
 packages:
   - packages/*
+  - apps/*
+  - tools
 
 # 의존성 버전은 여기서 정확히 고정한다 (ADR-0013)
 allowBuilds:
@@ -26,7 +28,7 @@ catalog:
   yaml: 2.9.1
   # 등록 단계 LLM (packages/author). 제공자 패키지는 사용자가 필요한 것만 설치한다
   '@langchain/core': 1.2.17
-  # MCP 서버 (packages/mcp)
+  # MCP 서버 (apps/mcp)
   '@modelcontextprotocol/sdk': 1.32.1
   zod: 4.6.7
   # 웹

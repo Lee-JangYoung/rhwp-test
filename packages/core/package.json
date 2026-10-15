@@ -9,12 +9,7 @@
     "./node": "./src/node/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json",
-    "gen:schema": "tsx scripts/gen-profile-schema.ts",
-    "gen:docs": "tsx scripts/gen-profile-docs.ts",
-    "gen:templates": "tsx scripts/make-templates.ts",
-    "gen:profiles": "tsx scripts/write-example-profiles.ts",
-    "kit:hancom": "tsx scripts/hancom-kit.ts"
+    "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "@rhwp/core": "catalog:",

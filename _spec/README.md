@@ -7,9 +7,10 @@
 ```
 packages/core    # @yangsik/core — md 읽기, 프로필 점검, 변환·자체 검증, 엔진 인터페이스(rhwp). Node/브라우저 공통, Node 전용은 @yangsik/core/node
 packages/author  # @yangsik/author — 등록 단계 LLM 연결(프로필 생성·검토). LLM 의존은 여기에만
-packages/cli     # @yangsik/cli — 명령줄(convert·validate·profile …)
-packages/mcp     # @yangsik/mcp — LLM 에이전트용 MCP 서버(stdio, 허용 폴더 제한). 서버는 LLM을 부르지 않음
-packages/web     # @yangsik/web — React + MUI 웹 UI (문서 유형 선택·변환·미리보기·프로필 점검)
+apps/cli         # @yangsik/cli — 명령줄(convert·validate·profile …)
+apps/mcp         # @yangsik/mcp — LLM 에이전트용 MCP 서버(stdio, 허용 폴더 제한). 서버는 LLM을 부르지 않음
+apps/web         # @yangsik/web — React + MUI 웹 UI (문서 유형 선택·변환·미리보기·프로필 점검)
+tools/           # 개발 도구(생성기, 한컴 확인 키트 생성기)    kit/hancom/  # 한컴 확인 키트 산출물
 templates/<유형>/ # 문서 유형 프로필: usecase · class-spec · db-spec · report (양식 template.hwpx + profile.yaml + schema.json + example.md)
 ```
 런타임 Node 24 LTS, pnpm 12 워크스페이스([ADR-0013](adr/0013-runtime-and-package-manager.md)).

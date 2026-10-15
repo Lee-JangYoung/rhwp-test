@@ -1,6 +1,6 @@
 # CLI: yangsik
 
-결정 근거와 계획: [I-4](../07-implementation/I-4-cli.md). 코어 함수의 얇은 어댑터이며 변환 로직이 없다. 실행: `pnpm yangsik <명령>` 또는 `node packages/cli/bin/yangsik.mjs <명령>` (TS 소스를 `tsx`로 실행, 빌드 없음).
+결정 근거와 계획: [I-4](../07-implementation/I-4-cli.md). 코어 함수의 얇은 어댑터이며 변환 로직이 없다. 실행: `pnpm yangsik <명령>` 또는 `node apps/cli/bin/yangsik.mjs <명령>` (TS 소스를 `tsx`로 실행, 빌드 없음).
 
 ```bash
 yangsik doctor                                     # 환경 점검(rhwp, Chromium, Node)

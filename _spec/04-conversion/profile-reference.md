@@ -1,6 +1,6 @@
 # 프로필 파일 레퍼런스 (v1)
 
-> 이 문서는 `packages/core`의 가이드 생성기에서 **자동 생성**한다(`pnpm --filter @yangsik/core gen:docs`). 직접 고치지 않는다. 설계 배경은 [doctype-profile.md](doctype-profile.md).
+> 이 문서는 `packages/core`의 가이드 생성기에서 **자동 생성**한다(`pnpm gen:docs`). 직접 고치지 않는다. 설계 배경은 [doctype-profile.md](doctype-profile.md).
 
 ## 최소 프로필 예 (유스케이스 명세서)
 

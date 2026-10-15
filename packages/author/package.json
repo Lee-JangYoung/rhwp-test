@@ -9,8 +9,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json",
-    "spike": "tsx scripts/spike.ts"
+    "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "@langchain/core": "catalog:",

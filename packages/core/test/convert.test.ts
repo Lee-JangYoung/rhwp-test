@@ -103,8 +103,8 @@ describe('P2·P3·P5 필드 채움, 반복 블록, 저장 검증', () => {
     mkdirSync(join(OUT, 'tpl'), { recursive: true });
     const { execFileSync } = await import('node:child_process');
     const inline = join(OUT, 'tpl/inline.hwpx');
-    execFileSync('npx', ['tsx', 'scripts/make-template.ts', inline], {
-      cwd: join(ROOT, 'packages/core'),
+    execFileSync('npx', ['tsx', 'make-templates.ts', inline], {
+      cwd: join(ROOT, 'tools'),
       env: { ...process.env, TABLE_INLINE: '1' },
     });
     const l = loadProfileFile(PROFILE);

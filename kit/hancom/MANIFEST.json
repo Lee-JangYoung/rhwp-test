@@ -1,7 +1,7 @@
 {
   "rhwp": "0.8.7",
   "mermaidRendered": true,
-  "generatedBy": "pnpm --filter @yangsik/core kit:hancom",
+  "generatedBy": "pnpm kit:hancom",
   "files": [
     {
       "file": "files/01-유스케이스-기본.hwpx",

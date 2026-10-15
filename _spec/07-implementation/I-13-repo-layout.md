@@ -1,6 +1,6 @@
 # I-13 패키지·폴더 재편
 
-상태: **계획(승인 대기)**. 결정: [ADR-0020](../adr/0020-package-restructure.md)(개발자 승인: 권장안 D1~D5). 선행: I-10. 후행: I-11, I-12(새 패키지가 처음부터 올바른 자리에 들어가도록 먼저 한다).
+상태: **S1 완료, S2~S4 진행 예정**(개발자 승인: S1 "진행"). 결정: [ADR-0020](../adr/0020-package-restructure.md)(개발자 승인: 권장안 D1~D5). 선행: I-10. 후행: I-11, I-12(새 패키지가 처음부터 올바른 자리에 들어가도록 먼저 한다).
 
 ## 목표
 동작을 바꾸지 않고 패키지와 폴더를 [ADR-0020](../adr/0020-package-restructure.md)의 구조로 옮긴다.
@@ -44,3 +44,10 @@ tools/    개발 도구      kit/hancom/  확인 키트      templates/  문서 
 | D3 | 웹은 `engine-rhwp`의 브라우저 초기화를 쓰고 Node 모듈을 끌어오지 않는다 | `/node` 분리 유지 |
 | D4 | 시험에서 `hwp`→`engine-rhwp`는 devDependency로만 허용 | 통합 시험에 실제 엔진 필요 |
 | D5 | 단계마다 커밋하고 PR #6에 얹는다(병합은 승인 후) | 규칙 6 |
+
+## S1 결과
+- `apps/{cli,mcp,web}`로 이동(깊이가 같아 상대 경로 대부분 유지, MCP 시험의 `core/test/util` import만 수정). 워크스페이스·vitest `include`에 `apps/*` 추가.
+- `tools/`를 워크스페이스 패키지(`@yangsik/tools`)로 만들고 생성기·확인 키트 생성기를 이동. 루트에서 `pnpm gen:schema|docs|templates|profiles`, `pnpm kit:hancom`, `pnpm author:spike`(tools). `core`·`author`의 해당 스크립트 항목 삭제. `make-template.ts`는 `make-templates.ts`에 합쳤다(경로를 인자로 주면 유스케이스 양식만 그 경로에 씀).
+- `p6-nofit.ts`·`stress.ts` 삭제. `_spec/06-quality/hancom-kit/` → `kit/hancom/`.
+- 확인: 시험 167개 그대로, 웹 e2e 4개, 확인 키트 SHA-256·쪽 수 동일, 생성기 재실행 시 양식·스키마·프로필 바이트 불변, `profile-reference.md`는 명령 안내 문구만 변경.
+- 한계: 코어 시험(`profile.test`)이 `tools/profile-docs`를 import한다(S3에서 `hwp` 시험으로 옮길 때 다시 본다).
