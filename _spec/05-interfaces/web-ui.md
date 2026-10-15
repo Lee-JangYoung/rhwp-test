@@ -1,6 +1,6 @@
-# 웹 UI (후순위, 가설)
+# 웹 UI
 
-결정: [ADR-0014](../adr/0014-web-ui-react-mui.md). UI는 **React + MUI**, 문서 표시는 `@rhwp/editor`(iframe). PoC(`packages/web`, 이식 전 원본은 보관 브랜치 `archive/poc-final`)는 MUI 없이 같은 흐름을 구현했고 [S-18](../06-quality/verification-spike.md)로 확인했다.
+결정: [ADR-0014](../adr/0014-web-ui-react-mui.md)·[ADR-0018](../adr/0018-web-ui-mui-adopted.md), 구현 기록: [I-8](../07-implementation/I-8-web-ui.md) (MUI로 재구성 완료). UI는 **React + MUI**, 문서 표시는 `@rhwp/editor`(iframe). PoC(`packages/web`, 이식 전 원본은 보관 브랜치 `archive/poc-final`)는 MUI 없이 같은 흐름을 구현했고 [S-18](../06-quality/verification-spike.md)로 확인했다.
 
 등록된 프로필로 **변환·미리보기·다운로드**를 하는 화면. 변환은 브라우저 안에서 수행해 문서를 서버로 보내지 않는다.
 

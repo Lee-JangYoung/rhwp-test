@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { convertBytes, parseProfile, ProfileError, type Profile, testProfile } from '../src/index';
+import { convertBytes, parseProfile, previewMapping, ProfileError, type Profile, testProfile } from '../src/index';
 import { createBlankDoc, rhwpEngine } from '../src/node/index';
 import { fakeDiagram } from './util/zip';
 
@@ -110,6 +110,14 @@ describe('클래스 명세서: 표 묶음 반복(range) + rows + 중첩 repeat +
       ['2. name', 'String', '', ''],
       ['3. email', 'String', '', ''],
     ]);
+  });
+
+  it('매핑 대조표는 표 묶음(range) 단위의 cells.in 표를 기준으로 만든다', async () => {
+    const m = await previewMapping(rhwpEngine, profileOf(c.profileText), c.md, c.template);
+    expect(m.templateLabels).toEqual(['클래스명', '패키지', '설명']);
+    expect(m.items.map((i) => i.id)).toEqual(['Member', 'Session']);
+    expect(m.items[0].rows.every((r) => r.found)).toBe(true);
+    expect(m.unusedLabels).toEqual([]);
   });
 
   it('점검: 없는 머리글·바깥 단위 밖의 표·잘못된 range·over 종류를 코드·후보와 함께 잡는다', async () => {

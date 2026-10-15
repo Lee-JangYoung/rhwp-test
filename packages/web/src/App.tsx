@@ -1,49 +1,89 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createEditor, type RhwpEditor } from '@rhwp/editor';
 import {
+  Alert,
+  AppBar,
+  Box,
+  Button,
+  Checkbox,
+  Chip,
+  CssBaseline,
+  FormControlLabel,
+  MenuItem,
+  Paper,
+  Select,
+  Stack,
+  Tab,
+  Tabs,
+  TextField,
+  ThemeProvider,
+  Toolbar,
+  Typography,
+  createTheme,
+} from '@mui/material';
+import {
+  checkProfile,
   convertBytes,
   type ConvertReport,
+  type Issue,
   type MappingPreview,
   parseProfile,
+  type Profile,
   previewMapping,
   ProfileError,
+  readMarkdown,
+  validateData,
   ValidationError,
 } from '@yangsik/core';
-import mdSample from '../../../templates/usecase/example.md?raw';
-import profileText from '../../../templates/usecase/profile.yaml?raw';
-import schema from '../../../templates/usecase/schema.json';
-import templateUrl from '../../../templates/usecase/template.hwpx?url';
 import { engine, registerFont, renderDiagram, setDiagramFont } from './browser';
+import { DOCTYPES, loadTemplateBytes } from './doctypes';
+import { MappingPanel, ProfileIssues, ReportPanel, Section } from './panels';
 
-type Tab = 'template' | 'result';
+const theme = createTheme({ palette: { primary: { main: '#1d4ed8' } }, typography: { fontSize: 13 } });
+/** MUI 내부 입력 요소에 시험용 식별자를 붙인다 */
+const tid = (id: string) => ({ 'data-testid': id }) as Record<string, string>;
 
-const parsed = parseProfile(profileText);
-if (!parsed.profile) throw new Error(`내장 프로필 오류: ${JSON.stringify(parsed.issues)}`);
-const profile = parsed.profile;
+type View = 'template' | 'result';
 
 export function App() {
-  const [md, setMd] = useState(mdSample);
+  const first = DOCTYPES[0];
+  const [doctypeId, setDoctypeId] = useState(first?.id ?? '');
+  const doctype = DOCTYPES.find((d) => d.id === doctypeId) ?? first;
+  const [profile, setProfile] = useState<Profile>(first.profile);
+  const [profileNote, setProfileNote] = useState('내장 프로필');
+  const [dataSchema, setDataSchema] = useState<object | undefined>(first.schema);
+  const [md, setMd] = useState(first.example);
   const [template, setTemplate] = useState<Uint8Array | null>(null);
+  const [templateName, setTemplateName] = useState(`${first.id}/template.hwpx (내장 합성 양식)`);
   const [mapping, setMapping] = useState<MappingPreview | null>(null);
+  const [profileIssues, setProfileIssues] = useState<Issue[]>([]);
   const [violations, setViolations] = useState<string[]>([]);
   const [report, setReport] = useState<ConvertReport | null>(null);
   const [result, setResult] = useState<Uint8Array | null>(null);
-  const [tab, setTab] = useState<Tab>('template');
+  const [view, setView] = useState<View>('template');
+  const [open, setOpen] = useState({ mapping: true, report: true, profile: false });
   const [status, setStatus] = useState('양식 불러오는 중…');
   const [fonts, setFonts] = useState<string[]>([]);
   const [localFontDialog, setLocalFontDialog] = useState(false);
   const [auto, setAuto] = useState(true);
-  const [templateName, setTemplateName] = useState('usecase-synthetic.hwpx (내장 합성 양식)');
   const seq = useRef(0);
   const host = useRef<HTMLDivElement>(null);
   const editor = useRef<Promise<RhwpEditor> | null>(null);
 
+  // 문서 유형을 바꾸면 프로필·규약·예제·양식을 그 유형 것으로 바꾼다
   useEffect(() => {
-    // Artifact 같은 제한 환경에서는 .hwpx를 파일로 올릴 수 없어 빌드 때 data: URL로 내장한다(fetch 없이 해독)
-    const m = /^data:[^,]*;base64,(.*)$/.exec(templateUrl);
-    if (m) setTemplate(Uint8Array.from(atob(m[1]), (c) => c.charCodeAt(0)));
-    else fetch(templateUrl).then(async (r) => setTemplate(new Uint8Array(await r.arrayBuffer())));
-  }, []);
+    setProfile(doctype.profile);
+    setProfileNote('내장 프로필');
+    setDataSchema(doctype.schema);
+    setMd(doctype.example);
+    setTemplateName(`${doctype.id}/template.hwpx (내장 합성 양식)`);
+    setResult(null);
+    setReport(null);
+    setViolations([]);
+    setView('template');
+    setTemplate(null);
+    void loadTemplateBytes(doctype.templateUrl).then(setTemplate);
+  }, [doctype]);
 
   useEffect(() => {
     if (!host.current) return;
@@ -57,25 +97,43 @@ export function App() {
 
   const show = async (bytes: Uint8Array, name: string) => {
     try {
-      const r = await (await editor.current!).loadFile(bytes.slice().buffer, name, {
-        suppressDialogs: !localFontDialog,
-      });
+      const ed = await editor.current;
+      if (!ed) return;
+      const r = await ed.loadFile(bytes.slice().buffer, name, { suppressDialogs: !localFontDialog });
       setStatus(`에디터 로드 완료 (${r.pageCount}쪽)`);
     } catch (e) {
       setStatus(`에디터 로드 실패: ${(e as Error).message}`);
     }
   };
 
-  // 양식이 준비되면 에디터에 표시하고, md가 바뀌면 매핑·규약 위반을 갱신한다
   useEffect(() => {
-    if (template && tab === 'template') void show(template, 'template.hwpx');
-  }, [template, tab]);
+    if (template && view === 'template') void show(template, 'template.hwpx');
+  }, [template, view]);
+
+  // 프로필·양식이 바뀌면 점검한다(양식 대조)
+  useEffect(() => {
+    if (!template) return;
+    checkProfile(engine, profile, template, { dataSchema })
+      .then((r) => setProfileIssues(r.issues))
+      .catch((e) => setStatus(`프로필 점검 실패: ${(e as Error).message}`));
+  }, [profile, template, dataSchema]);
+
+  // md·프로필이 바뀌면 매핑을 갱신한다
   useEffect(() => {
     if (!template) return;
     previewMapping(engine, profile, md, template)
       .then(setMapping)
       .catch((e) => setStatus(`매핑 실패: ${(e as Error).message}`));
-  }, [md, template]);
+  }, [md, template, profile]);
+
+  // 입력 중 규약 검사는 엔진 없이 즉시 한다
+  const live = useMemo(() => {
+    const r = readMarkdown(profile, md);
+    const all = [...r.violations, ...(dataSchema ? validateData(r.data, dataSchema, r.lines, r.violations) : [])].sort(
+      (a, z) => a.line - z.line,
+    );
+    return all.map((v) => `input.md:${v.line}  ${v.path}  ${v.message}`);
+  }, [md, profile, dataSchema]);
 
   /** full=true: Mermaid 렌더까지 포함한 최종 변환, false: 빠른 미리보기(그림 제외) */
   const run = async (full: boolean) => {
@@ -88,7 +146,7 @@ export function App() {
         profile,
         mdText: md,
         template,
-        dataSchema: schema,
+        dataSchema,
         renderDiagram: full ? renderDiagram : undefined,
         skipDiagrams: !full, // 빠른 미리보기는 그림을 명시적으로 생략한다
         preview: false,
@@ -97,7 +155,7 @@ export function App() {
       setViolations([]);
       setReport(out.report);
       setResult(out.bytes);
-      setTab('result');
+      setView('result');
       await show(out.bytes, 'result.hwpx');
       setStatus(
         `${full ? '변환 완료' : '미리보기 완료(Mermaid 그림 제외)'} — 자체 검증 ${out.report.verify.ok ? '통과' : '실패'}`,
@@ -107,18 +165,21 @@ export function App() {
       if (e instanceof ValidationError) {
         setViolations(e.violations.map((v) => `input.md:${v.line}  ${v.path}  ${v.message}`));
         setStatus(`규약 위반 ${e.violations.length}건`);
-      } else if (e instanceof ProfileError) setStatus(`프로필 오류: ${e.issues.map((i) => i.message).join(' / ')}`);
-      else setStatus(`변환 실패: ${(e as Error).message}`);
+      } else if (e instanceof ProfileError) {
+        setProfileIssues(e.issues);
+        setOpen((o) => ({ ...o, profile: true }));
+        setStatus(`프로필 오류: ${e.issues.map((i) => i.message).join(' / ')}`);
+      } else setStatus(`변환 실패: ${(e as Error).message}`);
     }
   };
 
-  // md나 양식이 바뀌면 잠시 뒤 자동으로 빠른 미리보기를 돌린다
+  // md·프로필·양식이 바뀌면 잠시 뒤 자동으로 빠른 미리보기를 돌린다
+  // biome-ignore lint/correctness/useExhaustiveDependencies: run은 매 렌더 새로 만들어지며 입력 변경만 트리거로 쓴다
   useEffect(() => {
     if (!auto || !template) return;
     const t = setTimeout(() => void run(false), 800);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [md, template, auto]);
+  }, [md, template, profile, auto]);
 
   const loadTemplate = async (file: File | undefined) => {
     if (!file) return;
@@ -126,9 +187,23 @@ export function App() {
     setTemplateName(file.name);
     setResult(null);
     setReport(null);
-    setTab('template');
+    setView('template');
   };
-
+  const loadProfile = async (file: File | undefined) => {
+    if (!file) return;
+    const parsed = parseProfile(await file.text());
+    if (!parsed.profile) {
+      setProfileIssues(parsed.issues);
+      setOpen((o) => ({ ...o, profile: true }));
+      setStatus(`프로필 문법·스키마 오류 ${parsed.issues.length}건`);
+      return;
+    }
+    setProfile(parsed.profile);
+    setProfileNote(`올린 프로필: ${file.name}`);
+  };
+  const loadSchema = async (file: File | undefined) => {
+    if (file) setDataSchema(JSON.parse(await file.text()) as object);
+  };
   const loadMd = async (file: File | undefined) => {
     if (file) setMd(await file.text());
   };
@@ -143,7 +218,9 @@ export function App() {
   /** 에디터에서 사람이 고친 내용까지 포함해 내보낸다(우리 변환 결과 저장과 다름) */
   const exportFromEditor = async () => {
     try {
-      const bytes = await (await editor.current!).exportHwpx();
+      const ed = await editor.current;
+      if (!ed) return;
+      const bytes = await ed.exportHwpx();
       const s = await engine.open(bytes);
       try {
         setStatus(
@@ -172,132 +249,232 @@ export function App() {
     }
   };
 
-  const download = () => result && saveBlob(result, 'result.hwpx');
+  const shownViolations = violations.length ? violations : live;
+  const errorCount = profileIssues.filter((i) => i.severity === 'error').length;
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '420px 1fr', height: '100vh', font: '13px sans-serif' }}>
-      <div style={{ overflow: 'auto', padding: 8, borderRight: '1px solid #ccc' }}>
-        <h3 style={{ margin: '0 0 6px' }}>양식 (HWPX)</h3>
-        <div data-testid="template-name">{templateName}</div>
-        <input
-          data-testid="tplfile"
-          type="file"
-          accept=".hwpx"
-          onChange={(e) => void loadTemplate(e.target.files?.[0])}
-        />
-        <h3 style={{ margin: '8px 0 6px' }}>Markdown</h3>
-        <input
-          data-testid="mdfile"
-          type="file"
-          accept=".md,.markdown,.txt"
-          onChange={(e) => void loadMd(e.target.files?.[0])}
-        />
-        <textarea
-          data-testid="md"
-          value={md}
-          onChange={(e) => setMd(e.target.value)}
-          style={{ width: '100%', height: 220, fontFamily: 'monospace' }}
-        />
-        <div style={{ margin: '6px 0' }}>
-          <button type="button" data-testid="convert" onClick={() => void run(true)} disabled={!template}>
-            변환(Mermaid 포함)
-          </button>{' '}
-          <button type="button" data-testid="download" onClick={download} disabled={!result}>
-            변환 결과 저장
-          </button>{' '}
-          <button type="button" data-testid="export" onClick={() => void exportFromEditor()}>
-            에디터 내용 내보내기
-          </button>
-          <div>
-            <label>
-              <input data-testid="auto" type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} />{' '}
-              자동 미리보기 (입력 후 0.8초, Mermaid 제외)
-            </label>
-          </div>
-        </div>
-        <div style={{ margin: '6px 0' }}>
-          글꼴(.ttf/.otf/.woff2):{' '}
-          <input
-            data-testid="font"
-            type="file"
-            accept=".ttf,.otf,.woff,.woff2"
-            onChange={(e) => void addFont(e.target.files?.[0])}
-          />
-          {fonts.length > 0 && <div data-testid="fonts">등록: {fonts.join(', ')}</div>}
-          <label>
-            <input
-              data-testid="localfont"
-              type="checkbox"
-              checked={localFontDialog}
-              onChange={(e) => setLocalFontDialog(e.target.checked)}
-            />{' '}
-            에디터 로컬 글꼴 안내창 표시
-          </label>
-        </div>
-        <div data-testid="status">{status}</div>
-        {violations.length > 0 && (
-          <pre data-testid="violations" style={{ color: '#b00', whiteSpace: 'pre-wrap' }}>
-            {violations.join('\n')}
-          </pre>
-        )}
-        <h3>양식 매핑</h3>
-        {mapping && (
-          <div data-testid="mapping">
-            <div>양식 라벨: {mapping.templateLabels.join(', ') || '(없음)'}</div>
-            {mapping.unusedLabels.length > 0 && (
-              <div style={{ color: '#b60' }}>md에 값이 없는 라벨(비움): {mapping.unusedLabels.join(', ')}</div>
-            )}
-            {mapping.items.map((it) => (
-              <details key={it.id}>
-                <summary>
-                  {it.id} ({it.rows.filter((r) => !r.found).length} 누락)
-                </summary>
-                <table>
-                  <tbody>
-                    {it.rows.map((r) => (
-                      <tr key={r.label} style={{ color: r.found ? undefined : '#b00' }}>
-                        <td>{r.found ? '✔' : '✘ 양식에 없음'}</td>
-                        <td>{r.label}</td>
-                        <td style={{ whiteSpace: 'pre-wrap' }}>{r.value}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </details>
-            ))}
-          </div>
-        )}
-        {report && (
-          <>
-            <h3>변환 보고</h3>
-            <pre data-testid="report" style={{ whiteSpace: 'pre-wrap' }}>
-              {JSON.stringify(
-                { ...report, verify: { ok: report.verify.ok, failed: report.verify.checks.filter((c) => !c.ok) } },
-                null,
-                1,
-              )}
-            </pre>
-          </>
-        )}
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <div style={{ padding: 4 }}>
-          <button type="button" onClick={() => setTab('template')} disabled={tab === 'template'}>
-            양식
-          </button>{' '}
-          <button
-            type="button"
-            onClick={() => {
-              setTab('result');
-              if (result) void show(result, 'result.hwpx');
-            }}
-            disabled={!result || tab === 'result'}
-          >
-            결과
-          </button>
-        </div>
-        <div ref={host} data-testid="editor" style={{ flex: 1, minHeight: 0 }} />
-      </div>
-    </div>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <Box sx={{ display: 'grid', gridTemplateRows: 'auto 1fr', height: '100vh' }}>
+        <AppBar position="static" color="default" elevation={1}>
+          <Toolbar variant="dense" sx={{ gap: 2 }}>
+            <Typography variant="h6" component="h1" sx={{ fontWeight: 700 }}>
+              yangsik
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Markdown → 양식 HWPX (변환은 이 브라우저 안에서만 수행)
+            </Typography>
+            <Box sx={{ flex: 1 }} />
+            <Select
+              size="small"
+              value={doctypeId}
+              onChange={(e) => setDoctypeId(e.target.value)}
+              inputProps={tid('doctype')}
+            >
+              {DOCTYPES.map((d) => (
+                <MenuItem key={d.id} value={d.id}>
+                  {d.profile.name ?? d.profile.type} ({d.id})
+                </MenuItem>
+              ))}
+            </Select>
+          </Toolbar>
+        </AppBar>
+
+        <Box sx={{ display: 'grid', gridTemplateColumns: '460px 1fr', minHeight: 0 }}>
+          <Box sx={{ overflow: 'auto', p: 1.5, borderRight: 1, borderColor: 'divider' }}>
+            <Stack spacing={1.5}>
+              <Paper variant="outlined" sx={{ p: 1.5 }}>
+                <Typography variant="subtitle2" gutterBottom>
+                  양식·프로필
+                </Typography>
+                <Typography variant="body2" data-testid="template-name">
+                  {templateName}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" data-testid="profile-note">
+                  {profileNote}
+                </Typography>
+                <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', mt: 1 }} useFlexGap>
+                  <Button component="label" size="small" variant="outlined">
+                    양식(.hwpx)
+                    <input
+                      hidden
+                      type="file"
+                      accept=".hwpx"
+                      onChange={(e) => void loadTemplate(e.target.files?.[0])}
+                      {...tid('tplfile')}
+                    />
+                  </Button>
+                  <Button component="label" size="small" variant="outlined">
+                    프로필(.yaml)
+                    <input
+                      hidden
+                      type="file"
+                      accept=".yaml,.yml"
+                      onChange={(e) => void loadProfile(e.target.files?.[0])}
+                      {...tid('profilefile')}
+                    />
+                  </Button>
+                  <Button component="label" size="small" variant="outlined">
+                    규약(.json)
+                    <input
+                      hidden
+                      type="file"
+                      accept=".json"
+                      onChange={(e) => void loadSchema(e.target.files?.[0])}
+                      {...tid('schemafile')}
+                    />
+                  </Button>
+                </Stack>
+              </Paper>
+
+              <Paper variant="outlined" sx={{ p: 1.5 }}>
+                <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Typography variant="subtitle2">Markdown</Typography>
+                  <Stack direction="row" spacing={1}>
+                    <Button size="small" onClick={() => setMd(doctype.example)}>
+                      예제
+                    </Button>
+                    <Button component="label" size="small" variant="outlined">
+                      파일
+                      <input
+                        hidden
+                        type="file"
+                        accept=".md,.markdown,.txt"
+                        onChange={(e) => void loadMd(e.target.files?.[0])}
+                        {...tid('mdfile')}
+                      />
+                    </Button>
+                  </Stack>
+                </Stack>
+                <TextField
+                  multiline
+                  fullWidth
+                  minRows={10}
+                  maxRows={18}
+                  value={md}
+                  onChange={(e) => setMd(e.target.value)}
+                  slotProps={{ htmlInput: { ...tid('md'), style: { fontFamily: 'monospace', fontSize: 12 } } }}
+                  sx={{ mt: 1 }}
+                />
+                {shownViolations.length > 0 ? (
+                  <Alert severity="error" sx={{ mt: 1 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      규약 위반 {shownViolations.length}건
+                    </Typography>
+                    <pre data-testid="violations" style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 12 }}>
+                      {shownViolations.join('\n')}
+                    </pre>
+                  </Alert>
+                ) : (
+                  <Alert severity="success" sx={{ mt: 1 }}>
+                    규약 검사 통과
+                  </Alert>
+                )}
+              </Paper>
+
+              <Paper variant="outlined" sx={{ p: 1.5 }}>
+                <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
+                  <Button
+                    variant="contained"
+                    size="small"
+                    onClick={() => void run(true)}
+                    disabled={!template}
+                    {...tid('convert')}
+                  >
+                    변환(Mermaid 포함)
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => result && saveBlob(result, 'result.hwpx')}
+                    disabled={!result}
+                    {...tid('download')}
+                  >
+                    변환 결과 저장
+                  </Button>
+                  <Button size="small" variant="outlined" onClick={() => void exportFromEditor()} {...tid('export')}>
+                    에디터 내용 내보내기
+                  </Button>
+                </Stack>
+                <FormControlLabel
+                  sx={{ display: 'block', mt: 0.5 }}
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={auto}
+                      onChange={(e) => setAuto(e.target.checked)}
+                      slotProps={{ input: tid('auto') }}
+                    />
+                  }
+                  label="자동 미리보기 (입력 후 0.8초, Mermaid 제외)"
+                />
+                <Typography variant="body2" data-testid="status" sx={{ mt: 0.5 }}>
+                  {status}
+                </Typography>
+              </Paper>
+
+              <Paper variant="outlined" sx={{ p: 1.5 }}>
+                <Typography variant="subtitle2" gutterBottom>
+                  글꼴 (Mermaid 그림용, 이 탭의 메모리에만 둠)
+                </Typography>
+                <input
+                  type="file"
+                  accept=".ttf,.otf,.woff,.woff2"
+                  onChange={(e) => void addFont(e.target.files?.[0])}
+                  {...tid('font')}
+                />
+                {fonts.length > 0 && <div data-testid="fonts">등록: {fonts.join(', ')}</div>}
+                <FormControlLabel
+                  sx={{ display: 'block' }}
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={localFontDialog}
+                      onChange={(e) => setLocalFontDialog(e.target.checked)}
+                      slotProps={{ input: tid('localfont') }}
+                    />
+                  }
+                  label="에디터 로컬 글꼴 안내창 표시"
+                />
+              </Paper>
+
+              <Section title="양식 매핑" open={open.mapping} onToggle={(v) => setOpen((o) => ({ ...o, mapping: v }))}>
+                <MappingPanel mapping={mapping} />
+              </Section>
+              <Section title="변환 보고" open={open.report} onToggle={(v) => setOpen((o) => ({ ...o, report: v }))}>
+                <ReportPanel report={report} />
+              </Section>
+              <Section
+                title="프로필 점검"
+                badge={
+                  profileIssues.length > 0 ? (
+                    <Chip size="small" color={errorCount ? 'error' : 'warning'} label={profileIssues.length} />
+                  ) : undefined
+                }
+                open={open.profile}
+                onToggle={(v) => setOpen((o) => ({ ...o, profile: v }))}
+              >
+                <ProfileIssues issues={profileIssues} />
+              </Section>
+            </Stack>
+          </Box>
+
+          <Box sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <Tabs
+              value={view}
+              onChange={(_, v: View) => {
+                setView(v);
+                if (v === 'result' && result) void show(result, 'result.hwpx');
+              }}
+              sx={{ borderBottom: 1, borderColor: 'divider', minHeight: 36 }}
+            >
+              <Tab value="template" label="양식" sx={{ minHeight: 36 }} />
+              <Tab value="result" label="결과" disabled={!result} sx={{ minHeight: 36 }} />
+            </Tabs>
+            <Box ref={host} data-testid="editor" sx={{ flex: 1, minHeight: 0 }} />
+          </Box>
+        </Box>
+      </Box>
+    </ThemeProvider>
   );
 }

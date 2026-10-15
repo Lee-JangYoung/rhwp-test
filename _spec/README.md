@@ -8,7 +8,7 @@
 packages/core    # @yangsik/core — 양식 분석, 변환, md → IR, 엔진 인터페이스. Node/브라우저 공통, Node 전용은 @yangsik/core/node
 packages/author  # @yangsik/author — 등록 단계 LLM 연결(프로필 생성·검토). LLM 의존은 여기에만
 packages/cli     # @yangsik/cli — 명령줄 (명령 재설계는 I-4)
-packages/web     # @yangsik/web — React 웹 PoC (I-8에서 MUI로 재구성)
+packages/web     # @yangsik/web — React + MUI 웹 UI (문서 유형 선택·변환·미리보기·프로필 점검)
 packages/mcp     # @yangsik/mcp — LLM 에이전트용 MCP 서버(stdio, 허용 폴더 제한). 서버는 LLM을 부르지 않음
 templates/usecase # 첫 문서 유형 자료(스키마·합성 양식·예제 md). 프로필(`profile.yaml`)과 함께 I-3에서 프로필 기반 변환의 기준 자료로 쓴다
 templates/<유형>/ # (계획) 문서 유형 프로필: 양식(HWPX) + template.md + schema.json + profile.yaml + prompt.md

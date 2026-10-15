@@ -29,7 +29,7 @@ pnpm --filter @yangsik/web test:e2e
 | `templates/` | 문서 유형 폴더(프로필·합성 양식·규약·예제): usecase, class-spec, db-spec, report |
 | `packages/mcp` | `@yangsik/mcp` — MCP 서버(stdio): 프로필 작성·검증·변환 도구 12개 |
 | `packages/cli` | `@yangsik/cli` — 명령줄 |
-| `packages/web` | `@yangsik/web` — React 웹 PoC(`@rhwp/editor`), I-8에서 MUI로 재구성 |
+| `packages/web` | `@yangsik/web` — React + MUI 웹 UI(`@rhwp/editor` 임베드, 변환은 브라우저 안) |
 | `templates/usecase` | 첫 문서 유형 자료(스키마·합성 양식·예제 md) |
 
 ## 라이선스

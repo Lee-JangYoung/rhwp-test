@@ -22,15 +22,3 @@ export function findTablesIn<T>(s: DocumentSession, cand: Cand<T>[], loc: Locato
           : false;
   });
 }
-
-/** 본문 표 전체에서 찾는다(매핑 미리보기용). 지원하지 않는 위치 지정은 null. */
-export function findTables(s: DocumentSession, loc: Locator): { ref: TableRef; index: number }[] | null {
-  if (!loc.table) return null;
-  return findTablesIn(
-    s,
-    s.topTables().map((ref, index) => ({ ref, index, item: null })),
-    loc,
-  ).map(({ ref, index }) => ({ ref, index }));
-}
-
-export const sameRef = (a: TableRef, b: TableRef) => a.para === b.para && a.ctrl === b.ctrl;

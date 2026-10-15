@@ -11,6 +11,9 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@emotion/react": "catalog:",
+    "@emotion/styled": "catalog:",
+    "@mui/material": "catalog:",
     "@rhwp/core": "catalog:",
     "@rhwp/editor": "catalog:",
     "@yangsik/core": "workspace:*",

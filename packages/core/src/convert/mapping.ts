@@ -2,7 +2,7 @@ import type { DocumentEngine } from '../engine/types';
 import { readMarkdown } from '../markdown/read';
 import type { Binding, Locator, Profile, ValueSpec } from '../profile/types';
 import { labelCells } from './blocks';
-import { findTables } from './resolve';
+import { findTablesIn } from './resolve';
 import { getPath, type Scopes, resolveValue } from './values';
 
 export interface MappingRow {
@@ -33,7 +33,21 @@ export async function previewMapping(
     const rep = profile.bindings.find((b) => b.kind === 'repeat');
     const cellsB = ((rep?.do ?? []) as Binding[]).find((b) => b.kind === 'cells');
     if (!rep || !cellsB) return { templateLabels: [], items: [], unusedLabels: [] };
-    const tbl = (findTables(s, rep.unit as Locator) ?? [])[0];
+    // 첫 repeat의 단위(표 하나 또는 range의 표들) 안에서, cells의 in(없으면 단위 표)로 표를 정한다
+    const all = s.topTables().map((ref, index) => ({ ref, index, item: null }));
+    const unitLoc = rep.unit as Locator;
+    const unitTables = unitLoc.range
+      ? (() => {
+          const a = findTablesIn(s, all, unitLoc.range.start)[0];
+          const z = findTablesIn(s, all, unitLoc.range.end)[0];
+          return a && z ? all.filter((t) => t.index >= a.index && t.index <= z.index) : [];
+        })()
+      : findTablesIn(s, all, unitLoc);
+    const tbl = cellsB.in
+      ? findTablesIn(s, unitTables, cellsB.in as Locator)[0]
+      : unitTables.length === 1
+        ? unitTables[0]
+        : undefined;
     const lc = tbl
       ? labelCells(s, tbl.ref, {
           labelColumn: cellsB.labelColumn as number | undefined,
