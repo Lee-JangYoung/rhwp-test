@@ -1,6 +1,6 @@
 # I-2 프로필 형식 v1
 
-상태: D1~D3·D5~D9 확정(2026-10-15). **D4(반복·채움 모델)는 개정안 승인 대기** — 개발자 요구("실제 구현이므로 가능한 다양한 패턴을 수용하도록 설계")에 맞춰 일반화했다. 승인 전에는 구현을 시작하지 않는다.
+상태: **승인됨(2026-10-15), 구현 중.** D1~D12 확정(D4·D10~D12는 권장안으로 승인). D4는 개발자 요구("실제 구현이므로 가능한 다양한 패턴을 수용하도록 설계")에 맞춰 일반화한 바인딩 트리 모델이다.
 I-1은 PR #3로 병합됐다([I-1-core-port.md](I-1-core-port.md)). 배경: [doctype-profile.md](../04-conversion/doctype-profile.md), [ADR-0002](../adr/0002-template-file-based-styling.md), [ADR-0006](../adr/0006-template-registration-and-doctype-profile.md).
 
 ## 목표
@@ -206,15 +206,15 @@ policy:                              # 위반 시: error | warn | ignore  (기�
 | D1 | 프로필 폴더 구성 `templates/<유형>/`(`profile.yaml`, 양식, `schema.json`, 예제) + 프로필 파일 스키마 구성 문서화 | **확정** |
 | D2 | YAML | **확정** |
 | D3 | 항목 제목 패턴은 자리표시자(`'{id} {name}'`) | **확정** |
-| **D4** | **반복·채움 모델**: (a) 개정안 — 바인딩 트리(`kind` 등록부, 위치 지정 문법, 데이터 컬렉션·슬롯 모델, 중첩 가능). 미검증 `kind`는 정의만 하고 거부, 검증 후 활성화. **권장** (b) 이전안 — `repeat.unit`(table\|block) + `fill`(cells\|rows) 2층 고정 | **승인 대기** |
-| **D11** | **LLM 작성 지원 범위**: I-2는 형식·스키마·점검 출력을 LLM 친화로 설계(기본값, 구조화 오류+후보, `description` 달린 스키마, 선택적 `id`, 파일 비수정) + "LLM으로 프로필 쓰기" 절 + 양식 분석 JSON 정리까지. **제품 내 LLM 호출·프로필 생성기·검토 보고서는 별도 단계 [I-A](I-A-profile-authoring.md)**(개발자 요구, 승인 대기) | 개정 (I-A로 분리) |
-| **D12** | **MCP 도구 시점**(개발자 요구: 환각 최소화를 위해 가이드 전달과 MCP 도구 제공). (a) I-2는 도구 준비형 코어 API까지, **MCP 서버는 I-4(CLI) 직후 "프로필 작성 도구"만 먼저**(`analyze_template`, `list_kinds`, `get_guide`, `check_profile`, `preview_mapping`), 변환 도구(`validate_md`, `convert_md` 등)는 I-7 **권장** (b) I-2에서 바로 얇은 MCP 서버까지 구현 (c) 전부 I-7 | **승인 대기** |
+| **D4** | **반복·채움 모델**: (a) 개정안 — 바인딩 트리(`kind` 등록부, 위치 지정 문법, 데이터 컬렉션·슬롯 모델, 중첩 가능). 미검증 `kind`는 정의만 하고 거부, 검증 후 활성화. **권장** (b) 이전안 — `repeat.unit`(table\|block) + `fill`(cells\|rows) 2층 고정 | **확정(권장안 (a))** |
+| **D11** | **LLM 작성 지원 범위**: I-2는 형식·스키마·점검 출력을 LLM 친화로 설계(기본값, 구조화 오류+후보, `description` 달린 스키마, 선택적 `id`, 파일 비수정) + "LLM으로 프로필 쓰기" 절 + 양식 분석 JSON 정리까지. **제품 내 LLM 호출·프로필 생성기·검토 보고서는 별도 단계 [I-A](I-A-profile-authoring.md)**(개발자 요구, 승인 대기) | **확정**: I-2는 LLM 호출 없음, 제품 내 LLM은 I-A |
+| **D12** | **MCP 도구 시점**(개발자 요구: 환각 최소화를 위해 가이드 전달과 MCP 도구 제공). (a) I-2는 도구 준비형 코어 API까지, **MCP 서버는 I-4(CLI) 직후 "프로필 작성 도구"만 먼저**(`analyze_template`, `list_kinds`, `get_guide`, `check_profile`, `preview_mapping`), 변환 도구(`validate_md`, `convert_md` 등)는 I-7 **권장** (b) I-2에서 바로 얇은 MCP 서버까지 구현 (c) 전부 I-7 | **확정(권장안 (a))** |
 | D5 | 값 없는 라벨 기본 `clear`(`cells.unmappedValue`) | **확정** |
 | D6 | 정책 기본값 `error`, 항목별 `warn`·`ignore` | **확정** |
 | D7 | md 규약은 별도 JSON Schema 파일 참조 | **확정** |
 | D8 | 스타일 참조 제외(양식 셀 스타일 상속) | **확정** |
 | D9 | `checkProfile` CLI는 I-4 | **확정** |
-| D10 | 구현 시점: I-3에 `fields`·`cells`·`repeat`(table)·`diagrams`를 변환에 연결, I-5에 `rows`·중첩·`remove`·`paragraphs`(클래스·DB 명세서로 검증), `range`·`text`는 실제 양식에서 필요가 확인될 때 스파이크 후 활성화 | **승인 대기** |
+| D10 | 구현 시점: I-3에 `fields`·`cells`·`repeat`(table)·`diagrams`를 변환에 연결, I-5에 `rows`·중첩·`remove`·`paragraphs`(클래스·DB 명세서로 검증), `range`·`text`는 실제 양식에서 필요가 확인될 때 스파이크 후 활성화 | **확정(권장안 (a))** |
 
 ## 위험
 - 합성 양식 하나로 형식을 정한다. 실제 SI 양식에서 위치 지정이나 `kind`가 모자랄 수 있다. 그래서 등록 방식(원칙 2)과 "새 패턴은 `kind` 추가로 대응"을 형식의 일부로 둔다. 모자란 점은 I-5·I-6에서 보강한다.
