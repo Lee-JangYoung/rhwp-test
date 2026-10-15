@@ -12,6 +12,12 @@ I-1은 PR #3로 병합됐다([I-1-core-port.md](I-1-core-port.md)). 배경: [doc
 3. **검증된 것만 켠다**: 정의는 했지만 rhwp에서 검증하지 않은 `kind`는 `checkProfile`이 "아직 지원하지 않음"으로 거부한다. 스파이크로 검증해 [verification-spike.md](../06-quality/verification-spike.md)에 기록하면 켠다.
 4. **알 수 없는 키·`kind`는 오류**(오타 방지). `version`이 형식을 가리키고, 호환이 깨질 때만 올린다.
 5. **데이터 모델은 일반화**: md는 고정된 "유스케이스" 구조가 아니라 **이름 붙은 컬렉션·슬롯**으로 읽는다(아래).
+6. **LLM이 쓰고 사람이 고친다**: 프로필은 주로 LLM이 초안을 쓰고(호스트 에이전트, [ADR-0007](../adr/0007-llm-by-host-agent-conversion-llm-free.md)) 사람이 일부를 고친다. 그래서 형식은 다음을 만족해야 한다.
+   - **짧게 쓸 수 있다**: 기본값을 둔다(`labelColumn` 0, `valueColumn` 1, `unmappedValue` clear, `onEmpty` error, `output`·`policy` 생략 가능). 최소 프로필은 한 화면이다.
+   - **LLM이 틀리기 쉬운 곳을 기계가 잡는다**: 스키마 검증 + `checkProfile`이 **구조화된 오류**를 낸다(`code`, 프로필 경로, 메시지, 기대/실제, **양식에서 찾은 후보**: 예) "라벨 `액터`가 표에 없음, 양식의 라벨: 액터 명, 사전조건, …"). LLM이 이 출력만 보고 스스로 고칠 수 있어야 한다.
+   - **스키마가 LLM의 입력이 된다**: `profile.schema.json`의 모든 키에 `description`과 예를 달아, 구조화 출력·프롬프트에 그대로 쓸 수 있다.
+   - **사람이 일부만 고칠 수 있다**: 평평하고 읽기 쉬운 YAML, 바인딩마다 선택적 `id`(오류 메시지·대화에서 가리키는 이름), 바인딩끼리 독립(하나를 고쳐도 다른 것이 깨지지 않음), 주석 허용. **도구는 프로필 파일을 다시 쓰지 않는다**(주석·사람이 고친 부분 보존), 점검만 한다.
+   - 이 프로젝트에서 LLM 호출은 하지 않는다. 호스트 에이전트가 쓰도록 **입력(양식 분석, 스키마, 예제, 작성 가이드)과 점검 루프**만 제공한다(승인 워크플로·권한은 범위 밖).
 
 ## 지금 하드코딩된 것 (프로필로 옮길 대상)
 
@@ -26,6 +32,35 @@ I-1은 PR #3로 병합됐다([I-1-core-port.md](I-1-core-port.md)). 배경: [doc
 | `schemas/usecase.schema.json` | 유스케이스 전용 규약 | `schema`(참조) |
 
 ## 형식 v1 (제안)
+
+**최소 프로필 예** (기본값 덕분에 이 정도로 유스케이스 양식이 동작하는 것이 목표):
+
+```yaml
+version: 1
+type: usecase
+template: template.hwpx
+schema: schema.json
+md:
+  frontMatter: meta
+  collections:
+    items:
+      heading: { level: 2, pattern: '{id} {name}' }
+      slots:
+        - { as: kv, key: fields }
+        - { as: list, key: main, under: 기본 흐름 }
+        - { as: list, key: alt, under: 대안 흐름, optional: true }
+        - { as: code, key: diagrams, lang: mermaid }
+bindings:
+  - { kind: fields, map: { meta.title: 문서명, meta.version: 버전, meta.author: 작성자, meta.date: 작성일 } }
+  - kind: repeat
+    over: items
+    unit: { table: { label: UC ID } }
+    do:
+      - kind: cells
+        map: { UC ID: '{id}', 유스케이스명: '{name}', 기본 흐름: { from: main, format: numbered }, 대안 흐름: { from: alt, format: numbered }, '*': fields }
+      - { kind: diagrams, from: diagrams }
+```
+아래는 모든 키를 풀어 쓴 설명이다.
 
 최상위: `version`, `type`, `name`, `template`, `schema`, `md`, `bindings`, `output`, `policy`.
 
@@ -143,15 +178,17 @@ policy:                              # 위반 시: error | warn | ignore  (기�
 1. **스키마**: `profile.schema.json`. 최상위·`md`·`output`·`policy`는 고정 스키마, `bindings`는 `kind`별 스키마 조각을 합성(`oneOf`). 알 수 없는 키·`kind` 금지. 위반은 프로필 파일 경로와 키 경로로 보고한다.
 2. **동작 등록부**: `packages/core/src/profile/kinds/` — `kind`마다 스키마 조각, `check()`, 상태(`verified` | `defined`)를 가진다. I-2에서는 `fields`·`cells`·`repeat`(table)·`diagrams`가 `verified`, 나머지는 `defined`(적용 로직 없음).
 3. **타입·로더**: `packages/core/src/profile/` — `load.ts`(YAML 파싱 → 스키마 검증 → 타입). 환경 중립(파일 읽기는 호출자가 바이트·문자열로 주입, Node 편의 함수는 `node/`).
-4. **점검** `checkProfile(engine, profile, template)`: 위치 지정이 양식에서 해석되는지(표·행·누름틀·책갈피), `cells.map` 라벨이 표에 있는지, `schema`의 필수 항목이 바인딩으로 덮이는지, `defined` 상태 `kind` 사용 여부, `policy` 일관성. 결과는 오류/경고 목록(JSON).
+4. **점검** `checkProfile(engine, profile, template)`: 위치 지정이 양식에서 해석되는지(표·행·누름틀·책갈피), `cells.map` 라벨이 표에 있는지, `schema`의 필수 항목이 바인딩으로 덮이는지, `defined` 상태 `kind` 사용 여부, `policy` 일관성. 결과는 **구조화된 오류/경고 목록(JSON)**: `code`, `severity`, 프로필 경로(`bindings[1].do[0].map`)·바인딩 `id`, 메시지, `expected`/`actual`, **`candidates`**(양식에서 찾은 비슷한 라벨·표·누름틀, 가까운 철자 순). LLM이 이 결과만으로 고칠 수 있는지가 설계 기준이다.
+4-1. **양식 분석 출력(LLM 입력)**: `analyze()`가 프로필 작성에 필요한 사실을 낸다(표별 라벨·머리행·병합, 누름틀, 책갈피, 개요). 현재 값에 더해 표 안 텍스트 요약과 라벨 후보를 JSON으로 안정적으로 출력하도록 정리한다.
 5. **유스케이스 프로필 작성**: `templates/usecase/profile.yaml`. 합성 양식에 점검을 통과시킨다.
 6. **시험**: 정상 로드, 잘못된 프로필별 오류(알 수 없는 키·`kind`, 필수 키 누락, 값 형식), 양식에 라벨·누름틀이 없을 때 점검 실패, `defined` `kind` 거부, 정상 양식에서 통과. 클래스·DB 명세서 형태의 **프로필 예제(검증 전)** 가 스키마 검증은 통과하는지(형식이 그 패턴을 표현할 수 있는지)도 시험한다. 공개 API 범위 시험에 추가.
-7. **문서**: [doctype-profile.md](../04-conversion/doctype-profile.md)의 초안 절을 v1 명세로 교체하고, **프로필 파일 스키마 구성을 문서화**한다(모든 키의 이름·타입·필수 여부·기본값·설명·구현 상태를 표로, 폴더 구성과 예제 포함, `profile.schema.json`과 일치하는지 시험으로 확인). ADR-0016 기록.
+7. **문서**: [doctype-profile.md](../04-conversion/doctype-profile.md)의 초안 절을 v1 명세로 교체하고, **"LLM으로 프로필 쓰기" 절**(입력: 양식 분석 JSON·스키마·예제 프로필·예제 md, 루프: 초안 → `checkProfile` 오류 → 수정, 사람이 고칠 때의 규칙)을 두고, **프로필 파일 스키마 구성을 문서화**한다(모든 키의 이름·타입·필수 여부·기본값·설명·구현 상태를 표로, 폴더 구성과 예제 포함, `profile.schema.json`과 일치하는지 시험으로 확인). ADR-0016 기록.
 
 ## 완료 기준
 - `pnpm check` 통과, CI 통과. 기존 시험 13개가 그대로 통과한다(변환 동작은 바뀌지 않는다).
 - `templates/usecase/profile.yaml`이 스키마 검증과 `checkProfile`을 통과하고, 라벨·누름틀을 일부러 지운 양식에서는 어떤 바인딩이 왜 틀렸는지 알려 준다.
 - 클래스·DB 명세서 형태 프로필 예제가 스키마 검증을 통과한다(`checkProfile`은 `defined` `kind`로 거부).
+- **LLM 작성 시험**: LLM이 자주 내는 오류(오타 키·`kind`, 없는 라벨, 잘못된 enum, 경로 오타, 필수 바인딩 누락)를 일부러 넣은 프로필들이 각각 **오류 코드·경로·후보를 포함한 구조화 오류**로 보고된다. 최소 프로필 예가 기본값만으로 점검을 통과한다.
 - 새 `kind`를 등록하는 데 필요한 변경이 `kinds/` 한 곳과 시험으로 한정된다(등록 방식 확인용으로 시험 전용 `kind` 1개를 등록해 본다).
 
 ## 결정 사항
@@ -162,6 +199,7 @@ policy:                              # 위반 시: error | warn | ignore  (기�
 | D2 | YAML | **확정** |
 | D3 | 항목 제목 패턴은 자리표시자(`'{id} {name}'`) | **확정** |
 | **D4** | **반복·채움 모델**: (a) 개정안 — 바인딩 트리(`kind` 등록부, 위치 지정 문법, 데이터 컬렉션·슬롯 모델, 중첩 가능). 미검증 `kind`는 정의만 하고 거부, 검증 후 활성화. **권장** (b) 이전안 — `repeat.unit`(table\|block) + `fill`(cells\|rows) 2층 고정 | **승인 대기** |
+| **D11** | **LLM 작성 지원 범위**: (a) 형식·스키마·점검 출력을 LLM 친화로 설계(기본값, 구조화 오류+후보, `description` 달린 스키마, 선택적 `id`, 파일 비수정) + 문서의 "LLM으로 프로필 쓰기" 절. 양식 분석 JSON 정리는 포함, **LLM 호출·초안 생성기·승인 워크플로는 구현하지 않음**(호스트 에이전트 담당, 범위 밖). **권장** (b) (a) + 분석 결과로 프로필 뼈대를 자동 생성하는 도구 | **승인 대기** |
 | D5 | 값 없는 라벨 기본 `clear`(`cells.unmappedValue`) | **확정** |
 | D6 | 정책 기본값 `error`, 항목별 `warn`·`ignore` | **확정** |
 | D7 | md 규약은 별도 JSON Schema 파일 참조 | **확정** |
@@ -172,4 +210,5 @@ policy:                              # 위반 시: error | warn | ignore  (기�
 ## 위험
 - 합성 양식 하나로 형식을 정한다. 실제 SI 양식에서 위치 지정이나 `kind`가 모자랄 수 있다. 그래서 등록 방식(원칙 2)과 "새 패턴은 `kind` 추가로 대응"을 형식의 일부로 둔다. 모자란 점은 I-5·I-6에서 보강한다.
 - 일반화한 `md` 모델(컬렉션·슬롯)과 파서 구현은 I-3 범위이므로, 그때 `md` 절의 세부 조정이 생길 수 있다. 호환이 깨지면 `version`을 올린다.
+- LLM이 쓴 프로필이 점검을 통과해도 **변환 결과가 맞는다는 보장은 아니다**. 예제 md로 변환해 보는 **드라이런**(R-03)이 필요하며, 변환 연결(I-3)·CLI(I-4)에서 `profile test`로 제공한다.
 - 범용성을 위해 형식이 커진다. 사람이 쓰기 어렵지 않도록 문서화와 예제(유스케이스·클래스·DB 명세서 형태)를 함께 제공한다.
