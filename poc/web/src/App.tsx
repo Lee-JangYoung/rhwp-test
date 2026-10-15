@@ -26,7 +26,10 @@ export function App() {
   const editor = useRef<Promise<RhwpEditor> | null>(null);
 
   useEffect(() => {
-    fetch(templateUrl).then(async (r) => setTemplate(new Uint8Array(await r.arrayBuffer())));
+    // Artifact 같은 제한 환경에서는 .hwpx를 파일로 올릴 수 없어 빌드 때 data: URL로 내장한다(fetch 없이 해독)
+    const m = /^data:[^,]*;base64,(.*)$/.exec(templateUrl);
+    if (m) setTemplate(Uint8Array.from(atob(m[1]), (c) => c.charCodeAt(0)));
+    else fetch(templateUrl).then(async (r) => setTemplate(new Uint8Array(await r.arrayBuffer())));
   }, []);
 
   useEffect(() => {
