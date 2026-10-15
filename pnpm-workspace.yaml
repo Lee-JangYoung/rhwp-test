@@ -1,0 +1,9 @@
+packages:
+  - packages/*
+
+# 의존성 버전은 여기서 정확히 고정한다 (ADR-0013)
+catalog:
+  '@biomejs/biome': 2.5.15
+  '@types/node': 24.19.2
+  typescript: 7.0.2
+  vitest: 5.0.4
