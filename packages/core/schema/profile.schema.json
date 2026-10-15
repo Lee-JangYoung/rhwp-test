@@ -1,0 +1,678 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "yangsik 문서 유형 프로필 v1",
+  "type": "object",
+  "properties": {
+    "version": {
+      "const": 1,
+      "description": "프로필 형식 버전"
+    },
+    "type": {
+      "type": "string",
+      "description": "문서 유형 이름(예: usecase)"
+    },
+    "name": {
+      "type": "string",
+      "description": "사람이 읽는 이름(선택)"
+    },
+    "template": {
+      "type": "string",
+      "description": "양식 파일(HWPX). 프로필 폴더 기준 상대 경로"
+    },
+    "schema": {
+      "type": "string",
+      "description": "md 규약 JSON Schema 파일. 프로필 폴더 기준 상대 경로(선택)"
+    },
+    "md": {
+      "type": "object",
+      "description": "md를 이름 붙은 데이터로 읽는 규칙",
+      "properties": {
+        "frontMatter": {
+          "type": "string",
+          "description": "front-matter를 가리킬 데이터 이름(예: meta). 경로는 meta.title처럼 쓴다"
+        },
+        "collections": {
+          "type": "object",
+          "description": "컬렉션 이름 → 정의",
+          "additionalProperties": {
+            "$ref": "#/$defs/collection"
+          }
+        }
+      },
+      "required": [
+        "collections"
+      ],
+      "additionalProperties": false
+    },
+    "bindings": {
+      "type": "array",
+      "description": "양식 위치 × 데이터 × 동작의 목록",
+      "items": {
+        "$ref": "#/$defs/binding"
+      },
+      "minItems": 1
+    },
+    "output": {
+      "type": "object",
+      "description": "출력 옵션(생략 가능)",
+      "properties": {
+        "tablePageBreak": {
+          "enum": [
+            "none",
+            "table",
+            "cell"
+          ],
+          "default": "cell",
+          "description": "복제한 표의 쪽 경계 나눔"
+        },
+        "fitHeights": {
+          "type": "boolean",
+          "default": true,
+          "description": "채운 뒤 표 높이를 렌더 높이로 맞춤"
+        },
+        "diagram": {
+          "type": "object",
+          "properties": {
+            "maxWidthHu": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 40000,
+              "description": "그림 최대 폭(HWPUNIT)"
+            },
+            "scale": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 2,
+              "description": "다이어그램 렌더 배율"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "policy": {
+      "type": "object",
+      "description": "위반 시 동작(생략하면 모두 error)",
+      "properties": {
+        "onMissingLabel": {
+          "enum": [
+            "error",
+            "warn",
+            "ignore"
+          ],
+          "default": "error",
+          "description": "매핑한 라벨·위치가 양식에 없을 때"
+        },
+        "onMissingField": {
+          "enum": [
+            "error",
+            "warn",
+            "ignore"
+          ],
+          "default": "error",
+          "description": "매핑한 누름틀이 양식에 없을 때"
+        },
+        "onMissingRenderer": {
+          "enum": [
+            "error",
+            "warn",
+            "ignore"
+          ],
+          "default": "error",
+          "description": "다이어그램 렌더러가 없을 때"
+        },
+        "onUnmappedData": {
+          "enum": [
+            "error",
+            "warn",
+            "ignore"
+          ],
+          "default": "warn",
+          "description": "md에 있으나 어디에도 쓰이지 않은 데이터"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "version",
+    "type",
+    "template",
+    "md",
+    "bindings"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "slot": {
+      "type": "object",
+      "description": "항목 안에서 읽을 내용",
+      "properties": {
+        "as": {
+          "enum": [
+            "kv",
+            "records",
+            "list",
+            "text",
+            "code",
+            "table"
+          ],
+          "description": "읽는 방식: kv=키-값 표, records=목록형 표(행 레코드), list=목록, text=서술 문단, code=코드 블록, table=표 원형"
+        },
+        "key": {
+          "type": "string",
+          "description": "데이터 이름(바인딩의 경로에서 쓴다)"
+        },
+        "under": {
+          "type": "string",
+          "description": "이 제목 아래의 내용만 읽는다(하위 제목 텍스트)"
+        },
+        "optional": {
+          "type": "boolean",
+          "description": "없어도 규약 위반이 아님",
+          "default": false
+        },
+        "lang": {
+          "type": "string",
+          "description": "as가 code일 때 코드 블록 언어(예: mermaid)"
+        }
+      },
+      "required": [
+        "as",
+        "key"
+      ],
+      "additionalProperties": false
+    },
+    "collection": {
+      "type": "object",
+      "description": "반복되는 md 구조(예: 항목 제목 하나)",
+      "properties": {
+        "heading": {
+          "type": "object",
+          "description": "컬렉션 항목을 나누는 제목",
+          "properties": {
+            "level": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 6,
+              "description": "제목 수준(1~6)"
+            },
+            "pattern": {
+              "type": "string",
+              "description": "제목 텍스트 패턴. 자리표시자로 캡처한다. 예: '{id} {name}'"
+            }
+          },
+          "required": [
+            "level",
+            "pattern"
+          ],
+          "additionalProperties": false
+        },
+        "slots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/slot"
+          },
+          "description": "항목 안에서 읽을 내용(위에서부터)"
+        },
+        "children": {
+          "type": "object",
+          "description": "하위 컬렉션(이름 → 컬렉션)",
+          "additionalProperties": {
+            "$ref": "#/$defs/collection"
+          }
+        }
+      },
+      "required": [
+        "heading"
+      ],
+      "additionalProperties": false
+    },
+    "locator": {
+      "type": "object",
+      "description": "양식 안의 위치 지정(키 하나)",
+      "minProperties": 1,
+      "maxProperties": 1,
+      "properties": {
+        "table": {
+          "type": "object",
+          "description": "표. label/headerLabel/index/text 중 하나로 찾는다",
+          "minProperties": 1,
+          "properties": {
+            "label": {
+              "type": "string",
+              "description": "라벨 열에 이 텍스트가 있는 표"
+            },
+            "headerLabel": {
+              "type": "string",
+              "description": "머리행에 이 텍스트가 있는 표"
+            },
+            "index": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "문서에서 n번째 표(0부터)"
+            },
+            "text": {
+              "type": "string",
+              "description": "표 안 어딘가에 이 텍스트가 있는 표"
+            },
+            "column": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "label을 찾을 열(기본 0)"
+            }
+          },
+          "additionalProperties": false
+        },
+        "range": {
+          "type": "object",
+          "description": "시작~끝 사이의 연속 본문 요소(미지원)",
+          "properties": {
+            "start": {
+              "$ref": "#/$defs/locator"
+            },
+            "end": {
+              "$ref": "#/$defs/locator"
+            }
+          },
+          "required": [
+            "start",
+            "end"
+          ],
+          "additionalProperties": false
+        },
+        "paragraph": {
+          "type": "object",
+          "description": "문단(미지원)",
+          "minProperties": 1,
+          "properties": {
+            "text": {
+              "type": "string",
+              "description": "이 텍스트가 있는 문단"
+            },
+            "style": {
+              "type": "string",
+              "description": "이 스타일의 문단"
+            },
+            "bookmark": {
+              "type": "string",
+              "description": "이 책갈피가 있는 문단"
+            }
+          },
+          "additionalProperties": false
+        },
+        "row": {
+          "type": "object",
+          "description": "표 안의 행(미지원)",
+          "properties": {
+            "label": {
+              "type": "string",
+              "description": "라벨 열에 이 텍스트가 있는 행"
+            }
+          },
+          "required": [
+            "label"
+          ],
+          "additionalProperties": false
+        },
+        "field": {
+          "type": "string",
+          "description": "누름틀 이름"
+        },
+        "bookmark": {
+          "type": "string",
+          "description": "책갈피 이름"
+        }
+      },
+      "additionalProperties": false
+    },
+    "valueSpec": {
+      "description": "값 표기: 자리표시자 문자열('{id}') 또는 { from, format, default }",
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "from": {
+              "type": "string",
+              "description": "데이터 경로(반복 안에서는 그 항목 기준)"
+            },
+            "format": {
+              "enum": [
+                "plain",
+                "numbered",
+                "bulleted",
+                "lines",
+                "join"
+              ],
+              "default": "plain",
+              "description": "목록 표기 형식"
+            },
+            "default": {
+              "type": "string",
+              "description": "값이 없을 때 쓸 문자열"
+            }
+          },
+          "required": [
+            "from"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "binding": {
+      "discriminator": {
+        "propertyName": "kind"
+      },
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "fields",
+              "description": "동작 종류"
+            },
+            "id": {
+              "type": "string",
+              "description": "바인딩 이름(선택). 오류 메시지와 대화에서 가리키는 용도"
+            },
+            "map": {
+              "type": "object",
+              "description": "md 데이터 경로 → 양식 누름틀 이름",
+              "additionalProperties": {
+                "type": "string",
+                "description": "양식의 누름틀 이름"
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "map"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "cells",
+              "description": "동작 종류"
+            },
+            "id": {
+              "type": "string",
+              "description": "바인딩 이름(선택). 오류 메시지와 대화에서 가리키는 용도"
+            },
+            "in": {
+              "$ref": "#/$defs/locator",
+              "description": "값을 채울 표의 위치. 생략하면 바깥 repeat의 단위(표) 자체"
+            },
+            "labelColumn": {
+              "type": "integer",
+              "description": "라벨이 있는 열(0부터)",
+              "default": 0,
+              "minimum": 0
+            },
+            "valueColumn": {
+              "type": "integer",
+              "description": "값 셀이 있는 열(0부터). value가 right일 때",
+              "default": 1,
+              "minimum": 0
+            },
+            "value": {
+              "enum": [
+                "right",
+                "below"
+              ],
+              "default": "right",
+              "description": "값 셀의 위치: 라벨의 오른쪽 또는 아래"
+            },
+            "map": {
+              "type": "object",
+              "description": "양식 라벨 → 값. 키 '*'는 값 슬롯(kv)의 나머지 항목을 같은 이름의 라벨로 채운다",
+              "additionalProperties": {
+                "$ref": "#/$defs/valueSpec"
+              }
+            },
+            "unmappedValue": {
+              "enum": [
+                "clear",
+                "keep"
+              ],
+              "default": "clear",
+              "description": "값이 없는 라벨: clear=양식 안내 문구를 비움, keep=그대로 둠"
+            }
+          },
+          "required": [
+            "kind",
+            "map"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "repeat",
+              "description": "동작 종류"
+            },
+            "id": {
+              "type": "string",
+              "description": "바인딩 이름(선택). 오류 메시지와 대화에서 가리키는 용도"
+            },
+            "over": {
+              "type": "string",
+              "description": "반복할 md 컬렉션 이름(md.collections의 키, 또는 바깥 항목의 하위 컬렉션)"
+            },
+            "unit": {
+              "$ref": "#/$defs/locator",
+              "description": "복제할 양식 영역의 위치. 현재 지원: { table: ... }"
+            },
+            "onEmpty": {
+              "enum": [
+                "error",
+                "remove",
+                "keep"
+              ],
+              "default": "error",
+              "description": "항목이 없을 때: error=오류, remove=영역 삭제(미지원), keep=그대로"
+            },
+            "do": {
+              "type": "array",
+              "description": "복제본마다 실행할 바인딩(이 안의 경로는 그 항목 기준)",
+              "items": {
+                "$ref": "#/$defs/binding"
+              },
+              "minItems": 1
+            }
+          },
+          "required": [
+            "kind",
+            "over",
+            "unit",
+            "do"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "diagrams",
+              "description": "동작 종류"
+            },
+            "id": {
+              "type": "string",
+              "description": "바인딩 이름(선택). 오류 메시지와 대화에서 가리키는 용도"
+            },
+            "from": {
+              "type": "string",
+              "description": "다이어그램 코드를 담은 code 슬롯의 키"
+            },
+            "place": {
+              "enum": [
+                "afterUnit",
+                "atMarker"
+              ],
+              "default": "afterUnit",
+              "description": "삽입 위치: afterUnit=복제된 단위 바로 뒤, atMarker=at 위치(미지원)"
+            },
+            "at": {
+              "$ref": "#/$defs/locator",
+              "description": "place가 atMarker일 때의 위치"
+            }
+          },
+          "required": [
+            "kind",
+            "from"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "rows",
+              "description": "동작 종류"
+            },
+            "id": {
+              "type": "string",
+              "description": "바인딩 이름(선택). 오류 메시지와 대화에서 가리키는 용도"
+            },
+            "in": {
+              "$ref": "#/$defs/locator",
+              "description": "행을 반복할 표의 위치"
+            },
+            "headerRows": {
+              "type": "integer",
+              "description": "머리행 수",
+              "default": 1,
+              "minimum": 0
+            },
+            "templateRow": {
+              "type": "integer",
+              "description": "견본으로 쓸 데이터 행(머리행 다음 0부터)",
+              "default": 0,
+              "minimum": 0
+            },
+            "over": {
+              "type": "string",
+              "description": "레코드 목록의 경로(records 슬롯)"
+            },
+            "columns": {
+              "type": "object",
+              "description": "양식 열 머리글 → 레코드 키",
+              "additionalProperties": {
+                "type": "string",
+                "description": "레코드 키"
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "in",
+            "over",
+            "columns"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "paragraphs",
+              "description": "동작 종류"
+            },
+            "id": {
+              "type": "string",
+              "description": "바인딩 이름(선택). 오류 메시지와 대화에서 가리키는 용도"
+            },
+            "at": {
+              "$ref": "#/$defs/locator",
+              "description": "채울 문단의 위치"
+            },
+            "from": {
+              "type": "string",
+              "description": "목록·서술 슬롯의 경로"
+            },
+            "format": {
+              "enum": [
+                "plain",
+                "numbered",
+                "bulleted",
+                "lines",
+                "join"
+              ],
+              "default": "plain",
+              "description": "표기 형식"
+            }
+          },
+          "required": [
+            "kind",
+            "at",
+            "from"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "remove",
+              "description": "동작 종류"
+            },
+            "id": {
+              "type": "string",
+              "description": "바인딩 이름(선택). 오류 메시지와 대화에서 가리키는 용도"
+            },
+            "target": {
+              "$ref": "#/$defs/locator",
+              "description": "삭제할 영역의 위치"
+            },
+            "when": {
+              "type": "string",
+              "description": "조건: empty(경로) 또는 exists(경로)",
+              "pattern": "^(empty|exists)\\(.+\\)$"
+            }
+          },
+          "required": [
+            "kind",
+            "target",
+            "when"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "text",
+              "description": "동작 종류"
+            },
+            "id": {
+              "type": "string",
+              "description": "바인딩 이름(선택). 오류 메시지와 대화에서 가리키는 용도"
+            },
+            "in": {
+              "$ref": "#/$defs/locator",
+              "description": "토큰을 찾을 영역"
+            },
+            "map": {
+              "type": "object",
+              "description": "토큰 이름 → 값",
+              "additionalProperties": {
+                "$ref": "#/$defs/valueSpec"
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "map"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

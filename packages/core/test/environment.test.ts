@@ -26,11 +26,19 @@ describe('환경 독립 (ADR-0011)', () => {
   it('공개 API는 합의한 범위만 노출한다', () => {
     expect(Object.keys(api).sort()).toEqual(
       [
+        'GUIDE_TOPICS',
+        'ISSUE_CODES',
         'ValidationError',
+        'analyzeTemplate',
+        'buildProfileSchema',
+        'checkProfile',
         'convertBytes',
         'createRhwpEngine',
+        'describeKinds',
         'formatViolations',
+        'getProfileGuide',
         'parseMarkdown',
+        'parseProfile',
         'previewMapping',
         'validateIr',
       ].sort(),

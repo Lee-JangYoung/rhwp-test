@@ -1,0 +1,18 @@
+# 문서 전체가 하나의 목록 표인 문서(인터페이스 목록) 형태의 프로필 예제 (형식 검증용).
+# 항목마다 표를 복제하지 않고, 하나의 표에서 행을 반복한다(rows, 미검증).
+version: 1
+type: interface-list
+template: template.hwpx
+md:
+  frontMatter: meta
+  collections:
+    interfaces:
+      heading: { level: 2, pattern: '{id} {name}' }
+      slots:
+        - { as: kv, key: fields }
+bindings:
+  - { kind: fields, map: { meta.title: 문서명 } }
+  - kind: rows
+    in: { table: { headerLabel: 인터페이스ID } }
+    over: interfaces
+    columns: { 인터페이스ID: id, 인터페이스명: name }

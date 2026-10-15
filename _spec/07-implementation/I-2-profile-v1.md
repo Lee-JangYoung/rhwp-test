@@ -216,6 +216,13 @@ policy:                              # 위반 시: error | warn | ignore  (기�
 | D9 | `checkProfile` CLI는 I-4 | **확정** |
 | D10 | 구현 시점: I-3에 `fields`·`cells`·`repeat`(table)·`diagrams`를 변환에 연결, I-5에 `rows`·중첩·`remove`·`paragraphs`(클래스·DB 명세서로 검증), `range`·`text`는 실제 양식에서 필요가 확인될 때 스파이크 후 활성화 | **확정(권장안 (a))** |
 
+## 구현 결과 (2026-10-15)
+- `packages/core/src/profile/`: `kinds.ts`(등록부: 8개 kind, 검증됨 4·정의만 4), `schema.ts`(등록부에서 합성하는 JSON Schema), `parse.ts`(`parseProfile`: YAML 문법·스키마 검증·기본값·줄 번호), `check.ts`(`checkProfile`: 양식 대조), `analyze.ts`(`analyzeTemplate`), `guide.ts`(`describeKinds`·`getProfileGuide`), `issues.ts`(오류 코드 표 19개와 후보 계산). Node 편의 함수 `loadProfileFile`(`@yangsik/core/node`).
+- 산출물: `templates/usecase/profile.yaml`(최소 프로필, 가이드의 최소 예와 동일), `templates/_examples/`(클래스·DB·목록 문서 예제, 스키마 통과 + 점검은 "지원하지 않음"), `packages/core/schema/profile.schema.json`(생성), `_spec/04-conversion/profile-reference.md`(생성), ADR-0016.
+- 시험(vitest +29, 총 42개): 최소 프로필·기본값, 모든 kind 예제와 예제 프로필의 스키마 통과, **LLM이 자주 내는 오류 12종과 YAML 문법 오류**(코드·경로·후보·줄 번호), 정책 warn/ignore, 슬롯 미사용 경고, 양식 분석 JSON, 검증된 kind만 노출, 가이드·키 표가 등록부와 일치, 저장된 스키마·레퍼런스 문서가 생성 결과와 일치, **시험용 kind를 등록하면 스키마·점검·목록·가이드에 반영되고 기존 프로필은 그대로 통과**.
+- 변환 동작은 바꾸지 않았다(I-3에서 연결). 기존 시험 13개 그대로 통과.
+- **계획과 달라진 점**: ① "스키마의 필수 항목이 바인딩으로 덮이는지" 점검은 md 데이터 모델이 일반화되는 I-3으로 넘겼다(현재 스키마는 유스케이스 전용 IR 모양에 묶여 있음). 대신 쓰이지 않는 슬롯 경고(`slot-unused`)를 넣었다. ② 위치 지정은 `table`(label·headerLabel·index·text)만 해석하고 라벨 열은 0열만 지원한다(`column`은 정의만). ③ 양식 분석에 책갈피·개요는 아직 없다(`range` 지원 시 추가). ④ 이 환경에서 CI와 동일 조건(깨끗한 설치)은 PR의 CI로 확인한다.
+
 ## 위험
 - 합성 양식 하나로 형식을 정한다. 실제 SI 양식에서 위치 지정이나 `kind`가 모자랄 수 있다. 그래서 등록 방식(원칙 2)과 "새 패턴은 `kind` 추가로 대응"을 형식의 일부로 둔다. 모자란 점은 I-5·I-6에서 보강한다.
 - 일반화한 `md` 모델(컬렉션·슬롯)과 파서 구현은 I-3 범위이므로, 그때 `md` 절의 세부 조정이 생길 수 있다. 호환이 깨지면 `version`을 올린다.

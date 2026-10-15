@@ -1,23 +1,23 @@
 # 문서 유형 프로필
 
-결정: [ADR-0006](../adr/0006-template-registration-and-doctype-profile.md), [ADR-0007](../adr/0007-llm-by-host-agent-conversion-llm-free.md). 스키마와 파일 형식은 **가설**이며 실제 양식으로 확정한다(S-01, S-03, S-10, R-01, R-02).
+결정: [ADR-0006](../adr/0006-template-registration-and-doctype-profile.md), [ADR-0007](../adr/0007-llm-by-host-agent-conversion-llm-free.md)(등록 단계는 [ADR-0017](../adr/0017-llm-in-authoring-only.md)로 부분 대체), [ADR-0016](../adr/0016-profile-format-binding-tree.md). 형식 v1은 합성 양식 1종에서 검증됐으며 실제 양식으로 보강한다(S-01, S-03, S-10, R-01).
 
 ## 개념
 **프로필**은 문서 유형 하나(유스케이스·클래스·DB 명세서)의 변환 정의다. 양식(HWPX)을 기준으로 만들고, 변환은 프로필만 보고 수행한다. 파일 묶음이라 git으로 관리한다.
 
 ```
 templates/<유형>/
-├── 양식.hwpx        # 양식 원본 (개인정보 제거본)
-├── template.md      # AI에게 줄 md 골격
-├── schema.json      # 규약: 헤딩·표 열 이름/순서·필수·반복 단위
-├── profile.yaml     # md 요소 → 양식 스타일/필드 매핑
-└── prompt.md        # AI 작성 지침 + 예시
+├── profile.yaml     # 프로필(바인딩 트리): md 읽기 규칙 + 양식과의 연결 + 동작
+├── template.hwpx    # 양식 원본 (개인정보 제거본)
+├── schema.json      # md 규약(JSON Schema)
+├── example.md       # 예제 md (드라이런·가이드용)
+└── prompt.md        # (계획) md를 쓰는 LLM에게 줄 작성 지침
 ```
 
 ## 흐름
 ```
 [등록, 양식당 1회] 양식 → 분석(프로그램) → 프로필 작성(사람, 필요 시 LLM 보조) → 커밋
-[변환, 문서마다]   template.md → AI가 md 작성 → 규약 검증 ⇄ 수정 → 변환 → 검증 → HWPX
+[변환, 문서마다]   example.md·prompt.md → AI가 md 작성 → 규약 검증 ⇄ 수정 → 변환 → 검증 → HWPX
 ```
 1차는 사람이 프로필을 작성하고 분석 도구(`analyze`)가 보조한다. LLM 해석을 이용한 자동 초안은 후순위.
 
@@ -51,25 +51,51 @@ templates/<유형>/
 5. 병합 셀·원시 HTML 금지(병합은 양식 쪽에서 처리).
 6. 위반은 줄 번호·기대 값을 포함한 메시지로 반환한다.
 
-## profile.yaml 예 (가설)
-```yaml
-version: 1
-type: usecase
-template: 양식.hwpx
-contentStart: 본문시작            # 본문 삽입 위치(책갈피), 없으면 문서 끝
-repeat: { unit: 유스케이스 }       # 반복 블록 처리 방식은 R-02로 확정
-styles: { heading1: 개요 1, heading2: 개요 2, body: 바탕글, caption: 캡션 }
-fields: { title: 제목, version: 버전, author: 작성자, date: 작성일 }
+## 프로필 형식 v1 (구현됨, I-2)
+형식은 **바인딩 트리**다: "양식의 어디에(위치 지정), md의 무엇을(데이터), 어떻게(동작 kind)"를 잇는 목록이며 중첩할 수 있다([ADR-0016](../adr/0016-profile-format-binding-tree.md)). 키 전체의 이름·종류·필수 여부·기본값·설명은 **[profile-reference.md](profile-reference.md)**(코드에서 자동 생성)가 기준이고, JSON Schema는 `packages/core/schema/profile.schema.json`이다.
+
+**폴더 구성** (`templates/<유형>/`, 경로는 프로필 폴더 기준)
 ```
-- `styles` 값은 양식에 존재하는 스타일 이름이어야 한다. 시작 시 `getStyleList()`와 대조하고, 없으면 경고 후 `body`로 대체한다(`--strict`는 중단).
-- 개인정보가 있는 양식은 커밋하지 않는다.
+profile.yaml      # 프로필 (이 형식)
+template.hwpx     # 양식
+schema.json       # md 규약(JSON Schema)
+example.md        # 예제 md
+```
+형식 예제: 유스케이스 `templates/usecase/profile.yaml`, 클래스·DB 명세서·목록 문서 `templates/_examples/*.profile.yaml`(rows 등 미검증 kind를 쓰므로 점검은 "지원하지 않음").
 
-## 반복 블록 [R-02 성공(rhwp 내), 한컴 전 — ADR-0012]
-**채움형**으로 확정한다: 양식의 표를 복제하고 라벨 셀을 채운다([ADR-0012](../adr/0012-repeat-block-by-table-clone.md)). 생성형(표를 코드로 생성)은 양식의 병합·테두리·스타일 재현이 미검증이라 채택하지 않았다.
+**구성 요소**
+- `md`: md를 이름 붙은 **컬렉션**(반복되는 제목)과 **슬롯**(kv·records·list·text·code·table)으로 읽는 규칙. 컬렉션은 중첩할 수 있다.
+- `bindings`: 동작 목록. kind는 코드의 **등록부**(`kinds.ts`)에서만 추가되고, 스키마·가이드·점검이 모두 이 등록부에서 만들어진다.
+- `output`, `policy`: 출력 옵션, 위반 시 동작(기본 모두 `error`). 모두 생략 가능(기본값).
+- 알 수 없는 키·kind는 오류. 형식이 깨질 때만 `version`을 올린다.
 
-## PoC에서 확인된 매핑 방식 (프로필 v1의 출발점)
-- 라벨 규칙: 표의 0열 텍스트 = 라벨, 같은 행 1열 = 값 셀. 값이 없는 라벨은 양식 안내 문구를 비운다.
-- 누름틀은 이름으로 채운다(front-matter 키 → 누름틀 이름).
-- 양식의 시각 요소(스타일·표 모양)는 양식 파일에 남기고 프로필은 매핑과 동작만 정한다. 새 스타일은 셀에서 상속한다(명시적 스타일 참조 없음).
-- PoC에서는 매핑이 **코드에 하드코딩**돼 있다(`FIELD_MAP`, 유스케이스 라벨). 프로필로 옮기는 것이 2단계 작업이다([roadmap.md](../roadmap.md)).
-- 프로필 형식 v1은 **초안 단계**이며 미결이다: `md`(front-matter·항목 제목 패턴·섹션), `repeat`(표 선택·라벨/값 열·매핑), `output`(쪽 나눔·높이 맞춤·그림 폭), `policy`(라벨·필드·렌더러가 없을 때의 동작, 기본 오류). 위 `profile.yaml 예`는 이 초안으로 대체될 수 있다.
+**kind 상태**: 사용 가능(검증됨) `fields`·`cells`·`repeat`(표)·`diagrams`. 정의만 됨(`checkProfile`이 거부): `rows`·`paragraphs`·`remove`·`text`, 위치 지정 `range`·`paragraph`·`row`·`field`·`bookmark`. 검증 순서: 스파이크 → [verification-spike.md](../06-quality/verification-spike.md) 기록 → 활성화.
+
+## 반복·채움 패턴 수용 범위
+| 패턴 | 표현 | 상태 |
+|---|---|---|
+| 표지·문서 정보 | `fields` | 사용 가능 |
+| 항목마다 표 1개(유스케이스) | `repeat`(table) + `cells` | 사용 가능 |
+| 헤더 표 + 목록 표(클래스·DB 명세서) | `repeat` + `cells` + `rows` | rows 미검증(I-5) |
+| 항목 안 목록 표의 하위 반복, 문서 전체가 하나의 목록 표, 개정이력 | `repeat` 중첩, 바깥 `rows` | I-5 |
+| 선택 항목이 없으면 행·표 제거 | `remove` | 미검증 |
+| 문단·표 묶음 블록 반복 | `repeat`(range) | 미검증(R-02, S-10), 실제 양식에서 필요가 확인될 때 |
+| 서술형 절, 본문 토큰 치환 | `paragraphs`, `text` | 미검증 |
+| 다중 구역 양식 | — | 제외(분석 단계에서 거부) |
+
+새 패턴은 새 kind(또는 위치 지정)를 등록해 추가하며 형식 버전은 올리지 않는다.
+
+## LLM으로 프로필 쓰기 (환각 줄이기)
+프로필은 주로 LLM이 초안을 쓰고 사람이 일부를 고친다. LLM이 추측하지 않고 **사실을 조회해서** 쓰도록 코어가 다음을 제공한다(JSON 입출력의 순수 함수, MCP·CLI·제품 내 LLM이 같이 쓴다).
+
+| 함수 | 역할 |
+|---|---|
+| `analyzeTemplate(engine, template)` | 양식의 사실: 표별 라벨(0열)·머리글·병합, 누름틀, 글꼴. **프로필의 위치·라벨·누름틀 이름은 이 결과에 있는 것만 쓴다** |
+| `describeKinds()` | **검증된 kind만** 스키마·예제와 함께 준다(미검증 kind는 `includeDefined` 없이는 노출하지 않음) |
+| `getProfileGuide(topic)` | 작성 가이드(개요·최소 예·키·kind·위치 지정·경로·오류 코드). 등록부·스키마에서 생성되고, 가이드 속 모든 예제가 시험에서 스키마·점검을 통과한다 |
+| `parseProfile(text)` | YAML 문법과 스키마를 검증하고 기본값을 채운다. 오류에 **줄 번호** |
+| `checkProfile(engine, profile, template)` | 양식 대조 점검. 오류는 `code`·`path`·`line`·`id`·`candidates`(양식에서 찾은 가까운 라벨·누름틀 등)를 가진 JSON |
+
+**루프**: 초안 → `parseProfile`/`checkProfile` 오류 → 후보를 보고 수정 → 통과할 때까지 반복. 통과해도 변환 결과가 맞다는 보장은 아니므로 예제 md로 변환해 보는 드라이런(I-3)과 사람의 확인이 필요하다.
+
+**사람이 고칠 때**: 평평한 YAML이고 바인딩은 서로 독립이다(선택적 `id`로 가리킨다). 도구는 프로필 파일을 다시 쓰지 않는다(주석 보존). 고친 뒤 같은 점검을 다시 돌린다. 제품 내 LLM 생성·검토는 [I-A](../07-implementation/I-A-profile-authoring.md).

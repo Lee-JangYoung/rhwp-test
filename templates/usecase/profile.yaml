@@ -1,0 +1,28 @@
+version: 1
+type: usecase
+template: template.hwpx
+schema: schema.json
+md:
+  frontMatter: meta
+  collections:
+    items:
+      heading: { level: 2, pattern: '{id} {name}' }
+      slots:
+        - { as: kv, key: fields }
+        - { as: list, key: main, under: 기본 흐름 }
+        - { as: list, key: alt, under: 대안 흐름, optional: true }
+        - { as: code, key: diagrams, lang: mermaid }
+bindings:
+  - { kind: fields, map: { meta.title: 문서명, meta.version: 버전, meta.author: 작성자, meta.date: 작성일 } }
+  - kind: repeat
+    over: items
+    unit: { table: { label: UC ID } }
+    do:
+      - kind: cells
+        map:
+          UC ID: '{id}'
+          유스케이스명: '{name}'
+          기본 흐름: { from: main, format: numbered }
+          대안 흐름: { from: alt, format: numbered }
+          '*': fields
+      - { kind: diagrams, from: diagrams }
