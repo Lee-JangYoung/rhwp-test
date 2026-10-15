@@ -11,6 +11,7 @@
 | I-4~I-8 | CLI, 두 번째 문서 유형, 양식 등록·한컴 키트, MCP, 웹 UI(React + MUI) | 구현. 한컴 열림(S-23)은 사람 확인 대기 |
 | 평가·재설계 | 성능(S-28), 독립 검토(S-29), 결함 수정, 성능 개선, I-9(점검=변환·엄격 md) | 완료. [evaluation-2026-10.md](08-evaluation/evaluation-2026-10.md) |
 | **I-10** | **HWP 5.0 출력**(1차) | **구현**. 한컴 열림 미확인 → [I-10](07-implementation/I-10-hwp-output.md) |
+| I-13 | 패키지·폴더 재편(core / engine-rhwp / hwp / diagram + apps) — I-11 전에 수행 | 계획, **승인 대기** → [I-13](07-implementation/I-13-repo-layout.md), [ADR-0020](adr/0020-package-restructure.md) |
 | I-11 | ERD PNG(2차): md 관계 열 + mermaid `erDiagram`, Canvas 2D | 계획, **승인 대기** → [I-11](07-implementation/I-11-erd.md) |
 | I-12 | Office 출력(3차): DOCX·XLSX·PPTX 코드 생성 | 계획, **승인 대기** → [I-12](07-implementation/I-12-office-export.md) |
 
