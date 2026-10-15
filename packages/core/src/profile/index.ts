@@ -1,0 +1,12 @@
+export { analyzeTemplate } from './analyze';
+export type { TemplateFacts } from './analyze';
+export { checkProfile } from './check';
+export type { CheckResult } from './check';
+export { ISSUE_CODES } from './issues';
+export type { Issue, IssueCode } from './issues';
+export { parseProfile } from './parse';
+export type { ParseResult } from './parse';
+export { buildProfileSchema } from './schema';
+export type * from './types';
+export { describeKinds, getProfileGuide, GUIDE_TOPICS } from './guide';
+export type { GuideTopic, KindDescription } from './guide';

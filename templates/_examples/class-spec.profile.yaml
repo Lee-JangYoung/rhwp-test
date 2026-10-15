@@ -1,0 +1,32 @@
+# 클래스 명세서 형태의 프로필 예제 (형식 검증용, 양식 파일 없음).
+# 클래스마다 헤더 표 + 속성 표 + 메서드 표를 반복한다. rows는 아직 검증 전이라 점검에서 "지원하지 않음"이 나온다.
+version: 1
+type: class-spec
+template: template.hwpx
+md:
+  frontMatter: meta
+  collections:
+    classes:
+      heading: { level: 2, pattern: '{name}' }
+      slots:
+        - { as: kv, key: fields }
+        - { as: records, key: attributes, under: 속성 }
+        - { as: records, key: methods, under: 메서드 }
+bindings:
+  - { kind: fields, map: { meta.title: 문서명, meta.version: 버전 } }
+  - kind: repeat
+    id: class-block
+    over: classes
+    unit: { table: { label: 클래스명 } }
+    do:
+      - { kind: cells, map: { 클래스명: '{name}', '*': fields } }
+      - kind: rows
+        id: attributes
+        in: { table: { headerLabel: 속성명 } }
+        over: attributes
+        columns: { 속성명: name, 타입: type, 설명: desc }
+      - kind: rows
+        id: methods
+        in: { table: { headerLabel: 메서드명 } }
+        over: methods
+        columns: { 메서드명: name, 반환: returns, 설명: desc }

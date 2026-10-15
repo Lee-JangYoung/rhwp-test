@@ -30,7 +30,7 @@ templates/<유형>/ # (계획) 문서 유형 프로필: 양식(HWPX) + template.
 | 확인됨 (합성 양식, rhwp 내) | 누름틀 채움, 표 복제 + 복제본별 셀 채움, Mermaid 그림 삽입, 저장 후 자체 검증, 브라우저 동작, 에디터 임베드, 조판 보정(그림·표 높이·쪽 나눔) → [verification-spike.md](06-quality/verification-spike.md) |
 | 미검증 | **한컴 열림(S-23)**, 실제 SI 양식, 스타일 적용, 머리말·쪽번호 보존, 폭 계산·쪽수 정확도(S-11) |
 | 막힌 것 | 실제 양식 샘플(HWPX) 없음, 한컴 확인 환경 없음, 원격에 PR base 브랜치 없음 |
-| 미결 | "한컴과 거의 동일"의 기준, 프로필 형식 v1, MCP 우선순위, md 원본 정책, 서버 정책 → [roadmap.md](roadmap.md) |
+| 미결 | "한컴과 거의 동일"의 기준, MCP 우선순위, md 원본 정책, 서버 정책 → [roadmap.md](roadmap.md) |
 
 ## 문서 지도
 

@@ -10,6 +10,27 @@ export type { MappingPreview, MappingRow } from './convert/mapping';
 export { createRhwpEngine } from './engine/rhwp';
 export type * from './engine/types';
 export { parseMarkdown } from './markdown/parse';
+export {
+  analyzeTemplate,
+  buildProfileSchema,
+  checkProfile,
+  describeKinds,
+  getProfileGuide,
+  GUIDE_TOPICS,
+  ISSUE_CODES,
+  parseProfile,
+} from './profile/index';
+export type {
+  Binding,
+  CheckResult,
+  GuideTopic,
+  Issue,
+  IssueCode,
+  KindDescription,
+  ParseResult,
+  Profile,
+  TemplateFacts,
+} from './profile/index';
 export type { Ir } from './markdown/parse';
 export { formatViolations, validateIr } from './markdown/validate';
 export type { Violation } from './markdown/validate';
