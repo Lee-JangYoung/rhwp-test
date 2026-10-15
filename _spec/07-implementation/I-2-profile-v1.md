@@ -1,137 +1,175 @@
 # I-2 프로필 형식 v1
 
-상태: D1~D3·D5~D9 확정(2026-10-15). **D4(반복 유형 정의)는 정의안 승인 대기** — 승인 전에는 구현을 시작하지 않는다. I-1은 PR #3로 `main`에 병합됐다([I-1-core-port.md](I-1-core-port.md)). 배경: [doctype-profile.md](../04-conversion/doctype-profile.md), [ADR-0002](../adr/0002-template-file-based-styling.md), [ADR-0006](../adr/0006-template-registration-and-doctype-profile.md).
+상태: D1~D3·D5~D9 확정(2026-10-15). **D4(반복·채움 모델)는 개정안 승인 대기** — 개발자 요구("실제 구현이므로 가능한 다양한 패턴을 수용하도록 설계")에 맞춰 일반화했다. 승인 전에는 구현을 시작하지 않는다.
+I-1은 PR #3로 병합됐다([I-1-core-port.md](I-1-core-port.md)). 배경: [doctype-profile.md](../04-conversion/doctype-profile.md), [ADR-0002](../adr/0002-template-file-based-styling.md), [ADR-0006](../adr/0006-template-registration-and-doctype-profile.md).
 
 ## 목표
-지금 코드에 박혀 있는 매핑을 **설정 파일(프로필)** 로 표현할 수 있게 **형식 v1을 정의하고, 로드·검증·점검 도구를 만든다.** 변환 코드를 프로필에 연결하는 일은 I-3이다. 양식의 시각 요소는 양식 파일에 두고, 프로필은 연결(매핑)과 동작만 정한다.
+지금 코드에 박혀 있는 매핑을 **설정 파일(프로필)** 로 표현하고, **다양한 양식 패턴을 형식 변경 없이 수용**할 수 있는 형식 v1을 정의한다. 로드·검증·점검 도구를 만든다. 변환 코드를 연결하는 일은 I-3이다. 양식의 시각 요소는 양식 파일에 두고, 프로필은 연결(매핑)과 동작만 정한다.
+
+## 설계 원칙
+1. **선언적·조합 가능**: 프로필은 "어디에(양식 위치) 무엇을(md 데이터) 어떻게(동작)"를 잇는 **바인딩의 목록**이다. 바인딩은 중첩할 수 있고 깊이 제한이 없다.
+2. **닫힌 동작 집합 + 등록 방식**: 동작(`kind`)은 코드에 등록된 목록 안에서만 쓴다(임의 코드·표현식 없음). 새 패턴은 새 `kind`를 등록해 추가하며 **기존 프로필은 깨지지 않는다**. 각 `kind`는 스키마 조각, 점검 로직, 적용 로직, **검증 상태**를 가진다.
+3. **검증된 것만 켠다**: 정의는 했지만 rhwp에서 검증하지 않은 `kind`는 `checkProfile`이 "아직 지원하지 않음"으로 거부한다. 스파이크로 검증해 [verification-spike.md](../06-quality/verification-spike.md)에 기록하면 켠다.
+4. **알 수 없는 키·`kind`는 오류**(오타 방지). `version`이 형식을 가리키고, 호환이 깨질 때만 올린다.
+5. **데이터 모델은 일반화**: md는 고정된 "유스케이스" 구조가 아니라 **이름 붙은 컬렉션·슬롯**으로 읽는다(아래).
 
 ## 지금 하드코딩된 것 (프로필로 옮길 대상)
 
 | 위치 | 하드코딩 | 프로필 항목 |
 |---|---|---|
-| `convert.ts` `FIELD_MAP` | front-matter 키 → 누름틀 이름 | `md.frontMatter` |
-| `parse.ts` | H2 제목 `"{id} {name}"`, 항목 안 첫 표 = 라벨/값, H3 `기본 흐름`·`대안 흐름` = 목록 | `md.item` |
-| `convert.ts` `blockValues` | 라벨 `UC ID`·`유스케이스명`·`액터`… ← 어떤 값, 번호 형식 | `repeat.fill[].map` |
-| `convert.ts` | 양식의 **첫 번째 표**가 반복 단위, 0열 라벨/1열 값 | `repeat.unit`, `repeat.find`, `repeat.fill[].labelColumn`·`valueColumn` |
-| `convert.ts` | 값 없는 라벨은 비움, 없는 라벨은 경고 후 누락 | `repeat.fill[].unmappedValue`, `policy` |
-| `convert.ts` | 쪽 나눔 `cell`, 높이 맞춤, 그림 폭 40000 HU, 배율 2 | `output` |
+| `convert.ts` `FIELD_MAP` | front-matter 키 → 누름틀 이름 | `bindings`의 `fields` |
+| `parse.ts` | H2 제목 `"{id} {name}"`, 항목 안 첫 표 = 라벨/값, H3 `기본 흐름`·`대안 흐름` = 목록 | `md.collections` |
+| `convert.ts` `blockValues` | 라벨 ← 값, 번호 형식 | `cells`의 `map`·`format` |
+| `convert.ts` | 양식의 **첫 번째 표**가 반복 단위, 0열 라벨/1열 값 | `repeat`의 `unit` 위치 지정, `cells`의 열 설정 |
+| `convert.ts` | 값 없는 라벨 비움, 없는 라벨은 경고 후 누락 | `cells.unmappedValue`, `policy` |
+| `convert.ts` | 쪽 나눔 `cell`, 높이 맞춤, 그림 폭·배율 | `output` |
 | `schemas/usecase.schema.json` | 유스케이스 전용 규약 | `schema`(참조) |
 
 ## 형식 v1 (제안)
 
-```yaml
-version: 1
-type: usecase
-name: 유스케이스 명세서
-template: template.hwpx            # 프로필 폴더 기준 상대 경로
-schema: schema.json                # md 규약(JSON Schema), 프로필 폴더 기준
+최상위: `version`, `type`, `name`, `template`, `schema`, `md`, `bindings`, `output`, `policy`.
 
+### 1) `md` — md를 이름 붙은 데이터로 읽는 규칙
+md의 구조는 문서 유형마다 다르다(항목 제목 H2, 하위 항목 H3, 표, 목록, 코드 블록, 서술 문단). 그래서 **컬렉션**(반복되는 것)과 **슬롯**(그 안의 내용)으로 선언한다. 컬렉션은 다른 컬렉션 안에 둘 수 있다.
+
+```yaml
 md:
-  frontMatter:                     # md front-matter 키 → 양식 누름틀 이름
-    title: 문서명
-    version: 버전
-    author: 작성자
-    date: 작성일
-  item:                            # 항목 1건 = 제목 1개
-    heading: { level: 2, pattern: '{id} {name}' }
-    keyValueTable: true            # 항목 안 첫 표: 1열=라벨, 2열=값 → fields
-    sections:                      # 하위 제목 → 키
-      - { heading: 기본 흐름, key: main, as: list }
-      - { heading: 대안 흐름, key: alt, as: list, optional: true }
-    diagrams: true                 # ```mermaid 블록 → 그림
-
-repeat:                            # 항목 1건마다 양식의 어떤 부분을 반복하는가 (아래 "반복 유형")
-  unit: table                      # table | block
-  find: { label: UC ID }           # unit=table: 반복할 표 = 0열에 이 라벨이 있는 표 (또는 { index: 0 })
-  fill:                            # 반복 단위 안에서 값을 넣는 방식 (여러 개 가능)
-    - kind: cells                  # 라벨 셀 옆 값 셀에 단일 값을 넣는다
-      labelColumn: 0
-      valueColumn: 1
-      map:                         # 양식 라벨 → 값
-        UC ID: '{id}'
-        유스케이스명: '{name}'
-        기본 흐름: { from: sections.main, format: numbered }
-        대안 흐름: { from: sections.alt, format: numbered }
-        '*': fields                # 나머지 key-value 행은 같은 이름의 라벨로
-      unmappedValue: clear         # 값이 없는 라벨: clear(안내 문구 비움) | keep
-
-output:
-  tablePageBreak: cell             # none | table | cell
-  fitHeights: true
-  diagram: { place: afterBlock, maxWidthHu: 40000, scale: 2 }
-
-policy:                            # 위반 시 동작: error | warn | ignore
-  onMissingLabel: error            # 매핑한 라벨이 양식에 없음
-  onMissingField: error            # 매핑한 누름틀이 양식에 없음
-  onMissingRenderer: error         # 다이어그램 렌더러 없음
+  frontMatter: meta                  # front-matter → 데이터 이름 meta
+  collections:
+    items:                           # 데이터 이름
+      heading: { level: 2, pattern: '{id} {name}' }   # 캡처: id, name
+      slots:                         # 항목 안에서 읽을 내용 (match는 위에서부터 먼저 맞는 것)
+        - { as: kv,      key: fields }                              # 첫 key-value 표 (1열=키, 2열=값)
+        - { as: list,    key: main, under: 기본 흐름 }              # 해당 제목 아래 목록
+        - { as: list,    key: alt,  under: 대안 흐름, optional: true }
+        - { as: records, key: attributes, under: 속성 }             # 목록형 표 → 행 레코드(머리행=키)
+        - { as: text,    key: summary, under: 개요 }                # 서술 문단
+        - { as: code,    key: diagrams, lang: mermaid }             # 코드 블록(여러 개)
+      children:                      # 하위 컬렉션 (예: 클래스 아래 메서드 제목)
+        methods: { heading: { level: 3, pattern: '{name}' }, slots: [ ... ] }
 ```
+슬롯 종류: `kv`(키-값 표), `records`(목록형 표), `list`, `text`, `code`(언어 지정), `table`(원형 그대로). 모든 슬롯은 줄 번호를 보관해 위반 메시지에 쓴다.
 
-- **알 수 없는 키는 오류**(오타 방지). `version`은 필수이며 형식이 바뀌면 올린다.
-- 값 표기: `'{id}'` 형태의 자리표시자, 또는 `{ from, format }`. `format`은 `plain`(기본)·`numbered`.
-- **제외(v1)**: 조건문, 항목 안의 항목(3단 이상 중첩), 스타일 이름 매핑(양식 셀에서 상속), 다중 구역 양식, 예시가 채워진 양식의 라벨 별칭·위치 지정.
-
-## 반복 유형 (D4 정의안)
-
-SI 산출물의 반복은 표 하나가 복제되는 경우만이 아니다. 예: 클래스 명세서는 클래스마다 헤더 표 + 속성 표 + 메서드 표가 있고, 속성·메서드는 **행이 반복**된다. 그래서 반복을 두 층으로 정의한다.
-
-**1층 `repeat.unit` — 항목(md의 H2 한 건)마다 복제하는 양식 요소**
-
-| unit | 복제 대상 | 양식에서 찾는 법 | 구현 상태 |
-|---|---|---|---|
-| `table` | 표 하나 | `find: { label }` 또는 `{ index }` | rhwp에서 확인됨(R-02): `copyControl`+`pasteControl` |
-| `block` | 연속한 본문 요소 묶음(문단·표 여러 개) | 시작·끝 책갈피 `start: { bookmark }`, `end: { bookmark }` | 책갈피 조회(`getBookmarks`)와 `importParagraphBlock`은 있으나 **셀 내부 구조가 있는 블록에서 18/26만 성공**(R-02), 책갈피 범위 지정은 미검증(S-10). 실제 양식에서 필요가 확인될 때 구현 |
-
-**2층 `repeat.fill[]` — 복제된 단위 안에 값을 넣는 방식**
-
-| kind | 하는 일 | 값의 출처(md) | 구현 상태 |
-|---|---|---|---|
-| `cells` | 라벨 셀 옆 값 셀에 단일 값을 넣는다 | 항목의 key-value 표, 제목, 하위 섹션 | PoC에서 확인됨 |
-| `rows` | 표의 데이터 행(양식의 견본 행)을 레코드 수만큼 복제해 열마다 값을 넣는다 | 항목 안의 목록형 표(예: 속성·컬럼 정의) | rhwp `insertTableRow`·`deleteTableRow` 확인됨(S-05). **행 복제 후 셀 채움은 미검증** → I-5(클래스·DB 명세서)에서 구현·검증 |
-
-각 `fill`은 `find`로 단위 안의 어느 표인지 지정한다(생략하면 단위 자체가 표). `rows` 예:
-
+### 2) `bindings` — 양식 위치 × 데이터 × 동작
 ```yaml
-  fill:
-    - kind: cells
-      find: { label: 클래스명 }
-      map: { 클래스명: '{name}', 설명: { from: fields.설명 } }
-    - kind: rows                   # (I-5)
-      find: { label: 속성명 }      # 머리행에 이 라벨이 있는 표
-      headerRows: 1
-      from: tables.attributes      # md 항목 안의 목록형 표
-      columns: { 속성명: name, 타입: type, 설명: desc }
+bindings:
+  - kind: fields                        # 누름틀
+    map: { meta.title: 문서명, meta.version: 버전, meta.author: 작성자, meta.date: 작성일 }
+
+  - kind: repeat                        # 컬렉션 항목마다 양식 영역을 복제
+    over: items
+    unit: { table: { label: UC ID } }   # 복제할 양식 영역 (위치 지정 참조)
+    onEmpty: error                      # 항목이 없을 때: error | remove(영역 삭제) | keep
+    do:                                 # 복제본마다 실행 (이 안의 경로는 그 항목 기준)
+      - kind: cells                     # 라벨 옆 값 셀에 단일 값
+        labelColumn: 0
+        valueColumn: 1                  # 또는 value: below(라벨 아래 칸)
+        map:
+          UC ID: '{id}'
+          유스케이스명: '{name}'
+          기본 흐름: { from: main, format: numbered }
+          대안 흐름: { from: alt,  format: numbered }
+          '*': fields                   # 나머지 key-value는 같은 이름의 라벨로
+        unmappedValue: clear            # 값이 없는 라벨: clear | keep
+      - kind: diagrams                  # mermaid 코드 → 그림
+        from: diagrams
+        place: afterUnit                # afterUnit | atMarker
 ```
 
-- v1 로더·스키마는 **위 구조를 모두 정의**하되, `checkProfile`은 구현되지 않은 유형(`block`, `rows`)을 쓴 프로필에 "아직 지원하지 않음" 오류를 낸다. I-3에서 `table`+`cells`를 변환에 연결하고, `rows`는 I-5, `block`은 필요 시 구현한다.
-- 같은 1층 아래 서로 다른 표를 채우는 `fill`을 여러 개 둘 수 있어 클래스·DB 명세서의 "헤더 표 + 목록 표" 구조를 표현한다.
+**위치 지정(양식 안의 어디)** — `unit`, `in`, `at` 등에서 같은 문법:
+
+| 위치 | 의미 |
+|---|---|
+| `{ table: { label: X } }` | 0열(또는 지정 열)에 라벨 X가 있는 표 |
+| `{ table: { headerLabel: X } }` | 머리행에 X가 있는 표 |
+| `{ table: { index: n } }` | 문서에서 n번째 표 |
+| `{ table: { text: X } }` | 표 안 어딘가에 X가 있는 표 |
+| `{ range: { start: <위치>, end: <위치> } }` | 시작~끝 사이의 연속 본문 요소(문단·표 여러 개), 책갈피·제목 문단·표로 지정 |
+| `{ paragraph: { text: X } }` / `{ style: S }` / `{ bookmark: B }` | 문단 |
+| `{ row: { label: X } }` | 표 안의 행 |
+| `{ field: X }` / `{ bookmark: X }` | 누름틀 / 책갈피 |
+| 생략 | 바깥 영역(`do` 안에서는 복제된 단위) |
+
+**동작 `kind` 목록(v1 정의)**
+
+| kind | 하는 일 | 대표 패턴 |
+|---|---|---|
+| `fields` | 누름틀 채움 | 표지·문서 정보 |
+| `cells` | 라벨 옆(오른쪽·아래) 값 셀 채움 | 항목 헤더 표(유스케이스, 클래스 개요) |
+| `repeat` | 영역(표·범위·문단·행)을 컬렉션 항목 수만큼 복제하고 `do`를 실행 | 항목마다 표/블록 반복. **중첩 가능** |
+| `rows` | 표의 견본 행을 레코드 수만큼 복제해 열마다 채움 | 속성·메서드·컬럼 정의·인터페이스 목록, 개정이력 |
+| `paragraphs` | 문단(또는 문단 묶음)을 목록·서술 수만큼 채움/복제 | 서술형 절, 번호 목록 본문 |
+| `diagrams` | 코드 블록(mermaid)을 그림으로 삽입 | 다이어그램 |
+| `remove` | 조건에 따라 영역 삭제(`when: empty(경로)` 또는 `exists(경로)`) | 선택 항목(대안 흐름 없음)의 행·표 제거 |
+| `text` | 문단 안 토큰(`{{경로}}`) 치환 | 본문 속 값 삽입 |
+
+값 표기: 자리표시자 `'{id}'`, 또는 `{ from: 경로, format, default }`. `format`: `plain`(기본)·`numbered`·`bulleted`·`lines`·`join`. 경로는 점 표기이고 `repeat` 안에서는 그 항목 기준이다. 조건은 `empty`·`exists`만 쓴다(표현식 언어 없음).
+
+### 3) `output`·`policy`
+```yaml
+output:
+  tablePageBreak: cell               # none | table | cell
+  fitHeights: true
+  diagram: { maxWidthHu: 40000, scale: 2 }
+policy:                              # 위반 시: error | warn | ignore  (기본 모두 error)
+  onMissingLabel: error              # 매핑한 라벨·위치가 양식에 없음
+  onMissingField: error              # 누름틀이 없음
+  onMissingRenderer: error           # 렌더러 없음
+  onUnmappedData: warn               # md에 있으나 어디에도 쓰이지 않은 데이터
+```
+
+## 패턴 수용 범위 (SI 산출물)
+
+| 패턴 | 표현 | 필요한 kind | 상태 |
+|---|---|---|---|
+| 표지·문서 정보 | 누름틀 | `fields` | 확인됨 |
+| 항목마다 표 1개(유스케이스) | `repeat`(table)+`cells` | | 확인됨 → I-3 |
+| 라벨 아래 칸에 값 | `cells.value: below` | | 구현 시 검증(I-3) |
+| 항목마다 헤더 표 + 목록 표(클래스·DB 명세서) | `repeat`+`cells`+`rows` | `rows` | 행 복제·채움 미검증 → I-5 |
+| 항목 안의 목록 표 하위 반복(속성→제약 등) | `repeat` 중첩 | | I-5 |
+| 문서 전체가 하나의 목록 표(인터페이스 목록, 용어집) | 바깥 `rows` | | I-5 |
+| 개정이력 표(front-matter 목록) | `rows` | | I-5 |
+| 선택 항목이 없으면 행·표 제거 | `remove` | | 행 삭제 API 확인, 나머지 I-5 |
+| 항목마다 문단+표 여러 개 묶음 | `repeat`(range) | | 책갈피·블록 복제 미검증(R-02, S-10) → 실제 양식 확인 후 스파이크 |
+| 서술형 절·번호 목록 본문 | `paragraphs` | | 미검증 |
+| 문단 안 값 삽입 | `text` | | `replaceOne`이 표 셀에서 안 됨, 본문 한정 → 미검증 |
+| 다이어그램 | `diagrams` | | 확인됨(I-3) |
+| 다중 구역 양식 | — | | 제외(v1), 분석 단계에서 거부 |
+| 예시가 채워진 양식(라벨 별칭·위치 지정) | 위치 지정 `table.text` 등으로 일부 | | 실제 양식 확인 후 보강 |
+
+미검증 `kind`도 **형식에는 정의**하고 스키마가 구조를 검사하지만, `checkProfile`은 "아직 지원하지 않음"으로 거부한다. 패턴이 새로 필요해지면 ① 스파이크로 rhwp에서 검증 → ② 검증 기록 → ③ 해당 `kind` 활성화 순서로 추가한다. 위 목록에 없는 패턴은 새 `kind`(또는 위치 지정 종류)를 등록하며 형식 버전은 올리지 않는다.
 
 ## 작업
-1. **스키마**: `profile.schema.json`(JSON Schema, 알 수 없는 키 금지). 위반은 프로필 파일 경로와 키 경로로 보고한다.
-2. **타입·로더**: `packages/core/src/profile/` — `types.ts`, `load.ts`(YAML 파싱 → 스키마 검증 → 타입), 환경 중립(파일 읽기는 호출자가 바이트·문자열로 주입, Node 편의 함수는 `node/`).
-3. **점검** `checkProfile(engine, profile, template)`: 양식에 필요한 것이 다 있는지 확인한다. 반복 단위(표) 존재, `fill[].map` 라벨이 표에 있는지, 누름틀이 있는지, `schema`의 필수 항목이 `map`으로 덮이는지, `unmappedValue`·`policy` 일관성. 결과는 오류/경고 목록(JSON).
-4. **유스케이스 프로필 작성**: `templates/usecase/profile.yaml`을 위 예와 같이 두고 합성 양식에 점검을 통과시킨다.
-5. **시험**: 정상 프로필 로드, 잘못된 프로필별 오류(알 수 없는 키, 없는 필수 키, 값 형식), 양식에 라벨·누름틀이 없을 때 점검 실패, 정상 양식에서 점검 통과. 공개 API 범위 시험에 추가.
-6. **문서**: [doctype-profile.md](../04-conversion/doctype-profile.md)의 초안 절을 v1 명세로 교체하고, **프로필 파일 스키마 구성을 문서화**한다(모든 키의 이름·타입·필수 여부·기본값·설명·구현 상태를 표로, 폴더 구성과 예제 포함, `profile.schema.json`과 일치하는지 시험으로 확인). ADR-0016 기록.
+1. **스키마**: `profile.schema.json`. 최상위·`md`·`output`·`policy`는 고정 스키마, `bindings`는 `kind`별 스키마 조각을 합성(`oneOf`). 알 수 없는 키·`kind` 금지. 위반은 프로필 파일 경로와 키 경로로 보고한다.
+2. **동작 등록부**: `packages/core/src/profile/kinds/` — `kind`마다 스키마 조각, `check()`, 상태(`verified` | `defined`)를 가진다. I-2에서는 `fields`·`cells`·`repeat`(table)·`diagrams`가 `verified`, 나머지는 `defined`(적용 로직 없음).
+3. **타입·로더**: `packages/core/src/profile/` — `load.ts`(YAML 파싱 → 스키마 검증 → 타입). 환경 중립(파일 읽기는 호출자가 바이트·문자열로 주입, Node 편의 함수는 `node/`).
+4. **점검** `checkProfile(engine, profile, template)`: 위치 지정이 양식에서 해석되는지(표·행·누름틀·책갈피), `cells.map` 라벨이 표에 있는지, `schema`의 필수 항목이 바인딩으로 덮이는지, `defined` 상태 `kind` 사용 여부, `policy` 일관성. 결과는 오류/경고 목록(JSON).
+5. **유스케이스 프로필 작성**: `templates/usecase/profile.yaml`. 합성 양식에 점검을 통과시킨다.
+6. **시험**: 정상 로드, 잘못된 프로필별 오류(알 수 없는 키·`kind`, 필수 키 누락, 값 형식), 양식에 라벨·누름틀이 없을 때 점검 실패, `defined` `kind` 거부, 정상 양식에서 통과. 클래스·DB 명세서 형태의 **프로필 예제(검증 전)** 가 스키마 검증은 통과하는지(형식이 그 패턴을 표현할 수 있는지)도 시험한다. 공개 API 범위 시험에 추가.
+7. **문서**: [doctype-profile.md](../04-conversion/doctype-profile.md)의 초안 절을 v1 명세로 교체하고, **프로필 파일 스키마 구성을 문서화**한다(모든 키의 이름·타입·필수 여부·기본값·설명·구현 상태를 표로, 폴더 구성과 예제 포함, `profile.schema.json`과 일치하는지 시험으로 확인). ADR-0016 기록.
 
 ## 완료 기준
-- `pnpm check` 통과, CI 통과.
-- `templates/usecase/profile.yaml`이 스키마 검증과 `checkProfile`을 통과하고, 라벨·누름틀을 일부러 지운 양식에서는 어떤 항목이 왜 틀렸는지 알려 준다.
-- 변환 동작은 바뀌지 않는다(I-3에서 연결). 기존 시험 13개가 그대로 통과한다.
+- `pnpm check` 통과, CI 통과. 기존 시험 13개가 그대로 통과한다(변환 동작은 바뀌지 않는다).
+- `templates/usecase/profile.yaml`이 스키마 검증과 `checkProfile`을 통과하고, 라벨·누름틀을 일부러 지운 양식에서는 어떤 바인딩이 왜 틀렸는지 알려 준다.
+- 클래스·DB 명세서 형태 프로필 예제가 스키마 검증을 통과한다(`checkProfile`은 `defined` `kind`로 거부).
+- 새 `kind`를 등록하는 데 필요한 변경이 `kinds/` 한 곳과 시험으로 한정된다(등록 방식 확인용으로 시험 전용 `kind` 1개를 등록해 본다).
 
-## 결정 사항 (개발자 승인 필요)
+## 결정 사항
 
-| # | 결정 | 선택지 | 권장과 근거 |
-|---|---|---|---|
-| D1 | 프로필 파일 구성 | (a) 문서 유형 폴더 `templates/<유형>/` 에 `profile.yaml` + 양식 + `schema.json` + 예제 (b) 단일 파일에 모두 포함 | **확정: (a)** + 프로필 파일 스키마 구성(키 레퍼런스)을 문서화한다 |
-| D2 | 파일 형식 | (a) YAML (b) JSON | **확정(개발자 승인)** — **(a)**. 주석을 쓸 수 있고 사람이 편집한다. `yaml` 의존성은 이미 있다 |
-| D3 | 항목 제목 패턴 표기 | (a) 자리표시자 `'{id} {name}'` (b) 정규식(이름 있는 그룹) | **확정(개발자 승인)** — **(a)**. 사람·LLM이 읽고 쓰기 쉽다. 내부에서 정규식으로 컴파일한다. 복잡한 패턴이 필요해지면 `regex:` 키를 추가한다(v2) |
-| D4 | 반복 유형 | 개발자 요구: 반복이 표만 있지 않을 수 있으니 어떤 반복인지 정의 | **정의안 승인 대기** — 위 "반복 유형" 절. 선택지: (a) 모델 전체를 v1에 정의하고 `table`+`cells`만 구현, `rows`는 I-5, `block`은 필요 시(권장) (b) `rows`까지 I-3에서 구현(검증 안 된 행 채움이 I-3에 들어옴) (c) `block`까지 v1에서 구현(R-02·S-10 미검증 위험) |
-| D5 | 값이 없는 라벨의 기본 동작 | (a) `clear`(양식 안내 문구를 비움) (b) `keep` | **확정(개발자 승인)** — **(a)**. 현재 PoC 동작과 같고, 안내 문구("(입력)")가 산출물에 남는 것을 막는다 |
-| D6 | 정책 기본값 | (a) 모두 `error`, 항목별로 `warn`·`ignore` 선택 (b) 기본 `warn` | **확정(개발자 승인)** — **(a)**. 지금은 라벨이 없으면 경고만 하고 값이 조용히 빠진다. LLM에 되돌려 고치게 하려면 실패가 기본이어야 한다 |
-| D7 | md 규약(스키마) 연결 | (a) 별도 JSON Schema 파일을 `schema:`로 참조 (b) 프로필에서 스키마를 생성 | **확정(개발자 승인)** — **(a)**. 도구(Ajv)와 오류 메시지 체계가 이미 있다. 프로필과 스키마가 어긋나는 것은 `checkProfile`이 잡는다 |
-| D8 | 스타일 참조(`style:` 항목) | (a) v1에서는 제외, 양식 셀 스타일 상속 (b) 포함 | **확정(개발자 승인)** — **(a)**. 사용자 결정(전부 설정하지 않음)과 S-03 미검증 때문이다 |
-| D9 | `checkProfile`의 CLI 노출 | (a) I-2에서는 core 함수와 시험만, 명령은 I-4(`profile check`) (b) I-2에서 명령까지 | **확정(개발자 승인)** — **(a)**. CLI 명령 재설계가 I-4다 |
+| # | 결정 | 상태 |
+|---|---|---|
+| D1 | 프로필 폴더 구성 `templates/<유형>/`(`profile.yaml`, 양식, `schema.json`, 예제) + 프로필 파일 스키마 구성 문서화 | **확정** |
+| D2 | YAML | **확정** |
+| D3 | 항목 제목 패턴은 자리표시자(`'{id} {name}'`) | **확정** |
+| **D4** | **반복·채움 모델**: (a) 개정안 — 바인딩 트리(`kind` 등록부, 위치 지정 문법, 데이터 컬렉션·슬롯 모델, 중첩 가능). 미검증 `kind`는 정의만 하고 거부, 검증 후 활성화. **권장** (b) 이전안 — `repeat.unit`(table\|block) + `fill`(cells\|rows) 2층 고정 | **승인 대기** |
+| D5 | 값 없는 라벨 기본 `clear`(`cells.unmappedValue`) | **확정** |
+| D6 | 정책 기본값 `error`, 항목별 `warn`·`ignore` | **확정** |
+| D7 | md 규약은 별도 JSON Schema 파일 참조 | **확정** |
+| D8 | 스타일 참조 제외(양식 셀 스타일 상속) | **확정** |
+| D9 | `checkProfile` CLI는 I-4 | **확정** |
+| D10 | 구현 시점: I-3에 `fields`·`cells`·`repeat`(table)·`diagrams`를 변환에 연결, I-5에 `rows`·중첩·`remove`·`paragraphs`(클래스·DB 명세서로 검증), `range`·`text`는 실제 양식에서 필요가 확인될 때 스파이크 후 활성화 | **승인 대기** |
 
 ## 위험
-- 합성 양식 하나로만 형식을 정한다. 실제 SI 양식(병합 셀, 머리행 구조 등)에서 모자랄 수 있어, v1은 "유스케이스 1종에서 검증된 형식"으로 두고 I-5·I-6에서 보강한다.
-- md 파싱도 프로필 기반으로 일반화해야 하는데(현재 `UseCaseItem` 고정), 이는 I-3에서 한다. I-2의 `md` 절은 그때 읽혀 쓰이므로 I-3에서 형식 조정이 생길 수 있다.
+- 합성 양식 하나로 형식을 정한다. 실제 SI 양식에서 위치 지정이나 `kind`가 모자랄 수 있다. 그래서 등록 방식(원칙 2)과 "새 패턴은 `kind` 추가로 대응"을 형식의 일부로 둔다. 모자란 점은 I-5·I-6에서 보강한다.
+- 일반화한 `md` 모델(컬렉션·슬롯)과 파서 구현은 I-3 범위이므로, 그때 `md` 절의 세부 조정이 생길 수 있다. 호환이 깨지면 `version`을 올린다.
+- 범용성을 위해 형식이 커진다. 사람이 쓰기 어렵지 않도록 문서화와 예제(유스케이스·클래스·DB 명세서 형태)를 함께 제공한다.
