@@ -1,0 +1,23 @@
+{
+  "name": "@yangsik/author",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "양식 등록 단계의 LLM 연결: 프로필 생성·검토 (변환 경로는 LLM 없음)",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "spike": "tsx scripts/spike.ts"
+  },
+  "dependencies": {
+    "@langchain/core": "catalog:",
+    "@yangsik/core": "workspace:*",
+    "yaml": "catalog:"
+  },
+  "devDependencies": {
+    "tsx": "catalog:"
+  }
+}

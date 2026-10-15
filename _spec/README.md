@@ -6,6 +6,7 @@
 
 ```
 packages/core    # @yangsik/core — 양식 분석, 변환, md → IR, 엔진 인터페이스. Node/브라우저 공통, Node 전용은 @yangsik/core/node
+packages/author  # @yangsik/author — 등록 단계 LLM 연결(프로필 생성·검토). LLM 의존은 여기에만
 packages/cli     # @yangsik/cli — 명령줄 (명령 재설계는 I-4)
 packages/web     # @yangsik/web — React 웹 PoC (I-8에서 MUI로 재구성)
 packages/mcp     # (계획) LLM 에이전트용 MCP 서버
@@ -26,7 +27,7 @@ templates/<유형>/ # (계획) 문서 유형 프로필: 양식(HWPX) + template.
 
 | 항목 | 상태 |
 |---|---|
-| 저장소 내용 | `_spec/`, `CLAUDE.md`, `packages/`(core·cli·web, I-1 이식 완료, 하드코딩은 아직 있음), `templates/usecase`. PoC 원본은 보관 브랜치 `archive/poc-final` |
+| 저장소 내용 | `_spec/`, `CLAUDE.md`, `packages/`(core·author·cli·web; 변환은 프로필 기반, 하드코딩 제거 완료), `templates/usecase`. PoC 원본은 보관 브랜치 `archive/poc-final` |
 | 확인됨 (합성 양식, rhwp 내) | 누름틀 채움, 표 복제 + 복제본별 셀 채움, Mermaid 그림 삽입, 저장 후 자체 검증, 브라우저 동작, 에디터 임베드, 조판 보정(그림·표 높이·쪽 나눔) → [verification-spike.md](06-quality/verification-spike.md) |
 | 미검증 | **한컴 열림(S-23)**, 실제 SI 양식, 스타일 적용, 머리말·쪽번호 보존, 폭 계산·쪽수 정확도(S-11) |
 | 막힌 것 | 실제 양식 샘플(HWPX) 없음, 한컴 확인 환경 없음, 원격에 PR base 브랜치 없음 |

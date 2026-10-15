@@ -32,6 +32,7 @@ export type {
   Issue,
   IssueCode,
   KindDescription,
+  Locator,
   ParseResult,
   Profile,
   TemplateFacts,

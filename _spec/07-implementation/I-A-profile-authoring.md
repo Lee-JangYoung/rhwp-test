@@ -1,6 +1,6 @@
 # I-A 프로필 생성·검토 (제품 내 LLM 연결)
 
-상태: **결정 확정(2026-10-15), 착수는 I-3 이후**(D13~D20 권장안으로 승인). 개발자 요구: *본 제품에 LLM을 연결해, 양식 파일을 등록한 뒤 프로필을 LLM으로 생성하고 검토하는 기능을 추가한다.*
+상태: **결정 확정(2026-10-15), 구현 완료(키 없이 가능한 범위; 실제 모델 호출은 미검증)**. D13~D20 권장안으로 승인, 구현 결과는 문서 끝. 개발자 요구: *본 제품에 LLM을 연결해, 양식 파일을 등록한 뒤 프로필을 LLM으로 생성하고 검토하는 기능을 추가한다.*
 기존 결정과의 관계: [ADR-0007](../adr/0007-llm-by-host-agent-conversion-llm-free.md)은 "LLM은 호스트 에이전트가 맡고 제품은 LLM API를 부르지 않는다"였다. 이 단계는 **등록(프로필 생성·검토)에 한해 제품이 LLM을 직접 호출**하도록 바꾼다. **변환 경로는 계속 LLM 없이** 동작한다. 승인되면 ADR-0017로 ADR-0007을 부분 대체한다. 호스트 에이전트(MCP) 경로는 그대로 유지하고 두 경로가 같은 도구·점검을 공유한다.
 
 ## 선행 조건과 위치
@@ -122,3 +122,13 @@
 - LLM 출력은 비결정적이다(이 모델에서는 샘플링 설정도 불가). 그래서 결과를 점검·드라이런·보고서로 검증하고 사람이 확인하는 지점을 남긴다.
 - 양식 내용의 외부 전송은 정책이 필요하다(D15). 폐쇄망에서는 쓸 수 없다.
 - 합성 양식으로 품질을 평가하므로 실제 SI 양식에서의 품질은 I-6 이후에 알 수 있다 [검증 필요].
+
+## 구현 결과 (`packages/author`)
+- 구성: `llm.ts`(LlmClient 포트, 능력 A/B/C, 시험용 `ScriptedLlm`), `prompt.ts`(시스템·사용자 프롬프트, 도구 5종, 응답 스키마 `{profile, rationale}`), `generate.ts`(`generateProfile`, `previewPrompt`, `extractDraft`), `review.ts`(커버리지·근거 인용 확인·Markdown 보고서), `langchain.ts`(`langChainClient`: `BaseChatModel` 어댑터), `scripts/spike.ts`(키 있는 PC용 스파이크).
+- 루프: 초안 → `parseProfile` → `checkProfile` → (통과 시) `testProfile` 드라이런 → 오류 JSON을 되돌려 재생성. 통과 조건은 오류 0 + 드라이런 자체 검증 통과. 상한: 반복 5회, 토큰 40만(설정), 시도당 도구 8회. 상한에서 멈추면 마지막 초안과 남은 오류를 보고한다.
+- 전송: `allowSend: true`가 아니면 호출하지 않는다. `previewPrompt`가 보낼 내용을 미리 보여 주며 HWPX 바이너리·키는 포함되지 않는다(시험으로 확인).
+- 능력 A에서 도구를 쓰는 동안은 구조화 출력을 함께 쓰지 않고 최종 답을 JSON 텍스트로 받는다(도구+구조화 출력 동시 사용은 제공자마다 달라 피함). 이를 위해 A·C의 사용자 프롬프트에 JSON 출력 지시가 붙는다.
+- LangChain 추적은 `LANGSMITH_TRACING` 등을 `"true"`로 설정해야만 켜진다(`@langchain/core` 소스 확인). 설정하지 않으면 꺼져 있다.
+- 시험(작성자 패키지 12개, 네트워크 없음): 틀린 초안(없는 라벨·미등록 kind)이 점검 오류로 되돌아가 고쳐지는 루프, A/B/C 경로, 상한(반복·토큰·초안 없음), 전송 비허용, 프롬프트 미리보기, 근거 인용 확인, 가짜 LangChain 모델 경유, 코어에 LLM 의존이 없음.
+- **미검증 (키 필요)**: 실제 모델(Claude Opus 5.5, OpenAI 호환, Ollama)에서의 도구 호출·구조화 출력·스트리밍·사용량, LangChain 경유 Claude의 강제 `tool_choice`/샘플링 파라미터 충돌, 능력 자동 판정, 생성 품질(점검 통과율)과 비용. 개발자 PC에서 `pnpm --filter @yangsik/author spike -- <provider> <model> [A|B|C]`로 측정해 verification-spike.md(S-26)에 기록한다.
+- 이월: 스트리밍·프롬프트 캐시 지점·`fallbacks`는 어댑터가 아직 쓰지 않는다(스파이크 결과에 따라 직접 어댑터 또는 설정 추가). CLI 명령(`profile generate/review`)은 I-4.
