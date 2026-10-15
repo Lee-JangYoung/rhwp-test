@@ -18,6 +18,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "catalog:",
     "@yangsik/core": "workspace:*",
+    "@yangsik/engine-rhwp": "workspace:*",
     "tsx": "catalog:",
     "zod": "catalog:"
   }

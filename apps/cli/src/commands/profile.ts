@@ -11,7 +11,8 @@ import {
   type Issue,
   testProfile,
 } from '@yangsik/core';
-import { loadProfileFile, renderMermaid, rhwpEngine } from '@yangsik/core/node';
+import { loadProfileFile, renderMermaid } from '@yangsik/core/node';
+import { rhwpEngine } from '@yangsik/engine-rhwp/node';
 import { EXIT, formatIssues, type Out, readBytes, readText, UsageError } from '../util';
 
 /** 양의 정수 옵션(NaN·0·음수는 비용 상한을 끄거나 시도를 없애므로 거부) */

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { convertBytes, type Profile, parseProfile, readMarkdown, testProfile } from '../src/index';
-import { rhwpEngine } from '../src/node/index';
+import { rhwpEngine } from '../../engine-rhwp/src/node';
 
 const at = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 const load = (n: string) => ({

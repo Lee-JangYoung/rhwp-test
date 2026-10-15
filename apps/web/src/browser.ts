@@ -2,7 +2,8 @@
 import init from '@rhwp/core';
 import wasmUrl from '@rhwp/core/rhwp_bg.wasm?url';
 import mermaid from 'mermaid';
-import { createRhwpEngine, type DiagramRenderer } from '@yangsik/core';
+import type { DiagramRenderer } from '@yangsik/core';
+import { createRhwpEngine } from '@yangsik/engine-rhwp';
 
 export const engine = createRhwpEngine(async () => {
   const g = globalThis as Record<string, unknown>;

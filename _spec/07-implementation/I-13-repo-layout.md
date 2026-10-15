@@ -51,3 +51,10 @@ tools/    개발 도구      kit/hancom/  확인 키트      templates/  문서 
 - `p6-nofit.ts`·`stress.ts` 삭제. `_spec/06-quality/hancom-kit/` → `kit/hancom/`.
 - 확인: 시험 167개 그대로, 웹 e2e 4개, 확인 키트 SHA-256·쪽 수 동일, 생성기 재실행 시 양식·스키마·프로필 바이트 불변, `profile-reference.md`는 명령 안내 문구만 변경.
 - 한계: 코어 시험(`profile.test`)이 `tools/profile-docs`를 import한다(S3에서 `hwp` 시험으로 옮길 때 다시 본다).
+
+## S2 결과
+- `packages/engine-rhwp` 신설: `rhwp.ts`(엔진 구현), `node.ts`(`rhwpEngine`·`ensureRhwp`·`createBlankDoc`). 엔트리 `@yangsik/engine-rhwp`(`createRhwpEngine`)와 `@yangsik/engine-rhwp/node`. `core`의 `createRhwpEngine`·`rhwpEngine` 등 공개 API는 제거(호환 별칭 없음), `core`는 `@rhwp/core` 의존을 버림.
+- 브라우저 초기화(WASM 주소, `measureTextWidth`)는 웹 앱(`apps/web/src/browser.ts`)에 두고 `createRhwpEngine(init)`에 넘긴다. 번들러 전용(`?url`)이라 패키지로 옮기지 않았다(ADR-0020의 "Node/브라우저 초기화" 중 Node만 패키지에 있음).
+- `core` 시험은 아직 엔진이 필요해 `../../engine-rhwp/src/node`를 상대 경로로 import한다(워크스페이스 순환 의존을 피하려고). S3에서 `hwp`로 옮기며 해소.
+- 시험 +2 (`engine-rhwp/test/boundaries.test.ts`): `@rhwp/core` 의존은 `engine-rhwp`·웹뿐, `core` 소스는 `@rhwp/core`를 import하지 않음. 총 169개.
+- 확인: `pnpm check`, 웹 e2e 4개, 키트 SHA-256·쪽 수 동일.

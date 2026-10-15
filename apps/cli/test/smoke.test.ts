@@ -1,5 +1,5 @@
-import { createRhwpEngine } from '@yangsik/core';
-import { rhwpEngine } from '@yangsik/core/node';
+import { createRhwpEngine } from '@yangsik/engine-rhwp';
+import { rhwpEngine } from '@yangsik/engine-rhwp/node';
 import { expect, test } from 'vitest';
 
 test('cli가 워크스페이스의 core와 core/node를 참조한다', () => {

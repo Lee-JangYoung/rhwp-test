@@ -34,7 +34,6 @@ describe('환경 독립 (ADR-0011)', () => {
         'buildProfileSchema',
         'checkProfile',
         'convertBytes',
-        'createRhwpEngine',
         'describeKinds',
         'formatViolations',
         'getProfileGuide',

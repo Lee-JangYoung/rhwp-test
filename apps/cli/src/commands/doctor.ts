@@ -1,4 +1,5 @@
-import { findChromium, rhwpEngine } from '@yangsik/core/node';
+import { findChromium } from '@yangsik/core/node';
+import { rhwpEngine } from '@yangsik/engine-rhwp/node';
 import { EXIT, type Out } from '../util';
 
 export async function doctor(_args: string[], out: Out): Promise<number> {

@@ -11,7 +11,7 @@ import {
   testProfile,
   type Profile,
 } from '../src/index';
-import { createBlankDoc, rhwpEngine } from '../src/node/index';
+import { createBlankDoc, rhwpEngine } from '../../engine-rhwp/src/node';
 import { fakeDiagram, zipEntryHashes } from './util/zip';
 
 const at = (p: string) => fileURLToPath(new URL(p, import.meta.url));

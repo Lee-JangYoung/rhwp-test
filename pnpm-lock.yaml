@@ -277,6 +277,9 @@ importers:
       '@yangsik/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@yangsik/engine-rhwp':
+        specifier: workspace:*
+        version: link:../../packages/engine-rhwp
       tsx:
         specifier: 'catalog:'
         version: 4.23.15
@@ -293,6 +296,9 @@ importers:
       '@yangsik/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@yangsik/engine-rhwp':
+        specifier: workspace:*
+        version: link:../../packages/engine-rhwp
       tsx:
         specifier: 'catalog:'
         version: 4.23.15
@@ -320,6 +326,9 @@ importers:
       '@yangsik/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@yangsik/engine-rhwp':
+        specifier: workspace:*
+        version: link:../../packages/engine-rhwp
       mermaid:
         specifier: 'catalog:'
         version: 12.2.0
@@ -358,15 +367,15 @@ importers:
         specifier: 'catalog:'
         version: 2.9.1
     devDependencies:
+      '@yangsik/engine-rhwp':
+        specifier: workspace:*
+        version: link:../engine-rhwp
       tsx:
         specifier: 'catalog:'
         version: 4.23.15
 
   packages/core:
     dependencies:
-      '@rhwp/core':
-        specifier: 'catalog:'
-        version: 0.8.7
       '@types/mdast':
         specifier: 'catalog:'
         version: 4.0.4
@@ -396,6 +405,15 @@ importers:
         specifier: 'catalog:'
         version: 4.23.15
 
+  packages/engine-rhwp:
+    dependencies:
+      '@rhwp/core':
+        specifier: 'catalog:'
+        version: 0.8.7
+      '@yangsik/core':
+        specifier: workspace:*
+        version: link:../core
+
   tools:
     dependencies:
       '@yangsik/author':
@@ -404,6 +422,9 @@ importers:
       '@yangsik/core':
         specifier: workspace:*
         version: link:../packages/core
+      '@yangsik/engine-rhwp':
+        specifier: workspace:*
+        version: link:../packages/engine-rhwp
     devDependencies:
       tsx:
         specifier: 'catalog:'

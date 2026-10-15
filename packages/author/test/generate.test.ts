@@ -3,7 +3,7 @@ import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import YAML from 'yaml';
-import { rhwpEngine } from '@yangsik/core/node';
+import { rhwpEngine } from '@yangsik/engine-rhwp/node';
 import {
   extractDraft,
   generateProfile,

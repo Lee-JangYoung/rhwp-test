@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { rhwpEngine } from '@yangsik/core/node';
+import { rhwpEngine } from '@yangsik/engine-rhwp/node';
 import { describe, expect, it } from 'vitest';
 import YAML from 'yaml';
 import {

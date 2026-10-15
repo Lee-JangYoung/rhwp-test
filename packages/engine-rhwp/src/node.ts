@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { HwpDocument, initSync } from '@rhwp/core';
-import { createRhwpEngine } from '../engine/rhwp';
+import { createRhwpEngine } from './rhwp';
 
 let ready = false;
 

@@ -17,6 +17,7 @@
     "@rhwp/core": "catalog:",
     "@rhwp/editor": "catalog:",
     "@yangsik/core": "workspace:*",
+    "@yangsik/engine-rhwp": "workspace:*",
     "mermaid": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:"

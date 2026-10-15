@@ -9,7 +9,6 @@ export { previewMapping } from './convert/mapping';
 export { testProfile } from './convert/test-profile';
 export type { ProfileTestResult } from './convert/test-profile';
 export type { MappingPreview, MappingRow } from './convert/mapping';
-export { createRhwpEngine } from './engine/rhwp';
 export type * from './engine/types';
 export { readMarkdown } from './markdown/read';
 export type { MdRead } from './markdown/read';

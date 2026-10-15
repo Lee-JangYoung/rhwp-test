@@ -21,7 +21,8 @@ import {
   ValidationError,
   validateData,
 } from '@yangsik/core';
-import { findChromium, hwpPathOf, loadProfileFile, renderMermaid, rhwpEngine } from '@yangsik/core/node';
+import { findChromium, hwpPathOf, loadProfileFile, renderMermaid } from '@yangsik/core/node';
+import { rhwpEngine } from '@yangsik/engine-rhwp/node';
 import { z } from 'zod';
 import { PathGuard } from './paths';
 

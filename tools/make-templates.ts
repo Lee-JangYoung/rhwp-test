@@ -5,7 +5,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createBlankDoc } from '@yangsik/core/node';
+import { createBlankDoc } from '@yangsik/engine-rhwp/node';
 
 type Doc = ReturnType<typeof createBlankDoc>;
 const FIELDS = ['문서명', '버전', '작성자', '작성일'];

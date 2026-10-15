@@ -12,7 +12,6 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@rhwp/core": "catalog:",
     "@types/mdast": "catalog:",
     "ajv": "catalog:",
     "remark-frontmatter": "catalog:",

@@ -7,7 +7,8 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { convertBytes } from '@yangsik/core';
-import { findChromium, loadProfileFile, renderMermaid, rhwpEngine } from '@yangsik/core/node';
+import { findChromium, loadProfileFile, renderMermaid } from '@yangsik/core/node';
+import { rhwpEngine } from '@yangsik/engine-rhwp/node';
 
 const root = (p: string) => fileURLToPath(new URL(`../${p}`, import.meta.url));
 const OUT = process.argv[2] ?? root('out/hancom-kit');

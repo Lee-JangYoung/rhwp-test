@@ -7,7 +7,7 @@ import type {
   ImageInput,
   TableRef,
   TemplateAnalysis,
-} from './types';
+} from '@yangsik/core';
 
 interface Ctrl {
   ctrlId: string;

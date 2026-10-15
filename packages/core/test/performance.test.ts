@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { convertBytes, parseProfile } from '../src/index';
-import { rhwpEngine } from '../src/node/index';
+import { rhwpEngine } from '../../engine-rhwp/src/node';
 
 const dir = (n: string) => fileURLToPath(new URL(`../../../templates/${n}`, import.meta.url));
 const load = (n: string) => ({

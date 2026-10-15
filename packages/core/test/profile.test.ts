@@ -13,7 +13,8 @@ import {
   type Issue,
 } from '../src/index';
 import { CLASS_SPEC, DB_SPEC, KINDS, MINIMAL_USECASE } from '../src/profile/kinds';
-import { loadProfileFile, rhwpEngine } from '../src/node/index';
+import { loadProfileFile } from '../src/node/index';
+import { rhwpEngine } from '../../engine-rhwp/src/node';
 import { profileReferenceMarkdown } from '../../../tools/profile-docs';
 
 const at = (p: string) => fileURLToPath(new URL(p, import.meta.url));

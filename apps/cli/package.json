@@ -11,6 +11,7 @@
   "dependencies": {
     "@mermaid-js/mermaid-cli": "catalog:",
     "@yangsik/core": "workspace:*",
+    "@yangsik/engine-rhwp": "workspace:*",
     "tsx": "catalog:"
   },
   "bin": {

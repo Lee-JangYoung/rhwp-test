@@ -7,7 +7,7 @@
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { rhwpEngine } from '@yangsik/core/node';
+import { rhwpEngine } from '@yangsik/engine-rhwp/node';
 import { type Capability, generateProfile, langChainClient, reviewToMarkdown } from '@yangsik/author';
 
 const [provider, model, cap = 'A'] = process.argv.slice(2).filter((a) => a !== '--');

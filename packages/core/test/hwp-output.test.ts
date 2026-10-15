@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { verifyHwp } from '../src/convert/verify';
 import { convertBytes, type Profile, parseProfile } from '../src/index';
-import { rhwpEngine } from '../src/node/index';
+import { rhwpEngine } from '../../engine-rhwp/src/node';
 import { fakeDiagram } from './util/zip';
 
 const at = (p: string) => fileURLToPath(new URL(p, import.meta.url));

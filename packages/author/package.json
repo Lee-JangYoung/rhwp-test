@@ -17,6 +17,7 @@
     "yaml": "catalog:"
   },
   "devDependencies": {
+    "@yangsik/engine-rhwp": "workspace:*",
     "tsx": "catalog:"
   }
 }

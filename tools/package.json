@@ -15,7 +15,8 @@
   },
   "dependencies": {
     "@yangsik/author": "workspace:*",
-    "@yangsik/core": "workspace:*"
+    "@yangsik/core": "workspace:*",
+    "@yangsik/engine-rhwp": "workspace:*"
   },
   "devDependencies": {
     "tsx": "catalog:"
