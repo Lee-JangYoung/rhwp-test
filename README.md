@@ -13,7 +13,7 @@ pnpm install
 pnpm check                       # typecheck + lint + format + test
 pnpm --filter @yangsik/cli start -- check
 pnpm --filter @yangsik/cli start -- convert \
-  --md templates/usecase/example.md --template templates/usecase/template.hwpx --out out/usecase.hwpx
+  --profile templates/usecase/profile.yaml --md templates/usecase/example.md --out out/usecase.hwpx
 pnpm --filter @yangsik/web dev   # 웹 PoC (http://127.0.0.1:5173)
 pnpm --filter @yangsik/web test:e2e
 ```

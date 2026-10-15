@@ -74,6 +74,22 @@ export const ISSUE_CODES = {
     summary: '프로필이 가리키는 파일이 없음',
     fix: 'template·schema 경로(프로필 폴더 기준 상대 경로)를 확인한다.',
   },
+  'name-conflict': {
+    summary: '같은 컬렉션 안에서 캡처·슬롯·하위 컬렉션 이름이 겹침',
+    fix: '이름이 서로 다르게 고친다(제목 패턴의 {이름}, 슬롯 key, children 이름).',
+  },
+  'collection-empty': {
+    summary: '반복할 항목이 없음(변환 중 확인)',
+    fix: 'md에 항목을 추가하거나, 없어도 되면 repeat의 onEmpty를 keep으로 한다.',
+  },
+  'renderer-missing': {
+    summary: '다이어그램 렌더러가 없음(변환 중 확인)',
+    fix: '렌더러를 연결하거나 policy.onMissingRenderer를 warn/ignore로 한다.',
+  },
+  'schema-required-unmapped': {
+    summary: 'md 규약의 필수 항목이 양식에 채워지지 않을 수 있음',
+    fix: "cells.map에 해당 라벨을 추가하거나 '*'를 쓰고, 양식의 라벨에 있는지 확인한다.",
+  },
   'binding-empty': { summary: '바인딩이 하는 일이 없음', fix: 'map·columns 등 동작 내용을 채운다.' },
 } as const;
 

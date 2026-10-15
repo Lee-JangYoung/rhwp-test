@@ -169,8 +169,7 @@
         },
         "optional": {
           "type": "boolean",
-          "description": "없어도 규약 위반이 아님",
-          "default": false
+          "description": "없어도 규약 위반이 아님(기본 false, code 슬롯은 true)"
         },
         "lang": {
           "type": "string",

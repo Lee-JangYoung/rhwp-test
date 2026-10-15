@@ -1,12 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
 import { createEditor, type RhwpEditor } from '@rhwp/editor';
-import { convertBytes, type ConvertReport, type MappingPreview, previewMapping, ValidationError } from '@yangsik/core';
+import {
+  convertBytes,
+  type ConvertReport,
+  type MappingPreview,
+  parseProfile,
+  previewMapping,
+  ProfileError,
+  ValidationError,
+} from '@yangsik/core';
 import mdSample from '../../../templates/usecase/example.md?raw';
+import profileText from '../../../templates/usecase/profile.yaml?raw';
 import schema from '../../../templates/usecase/schema.json';
 import templateUrl from '../../../templates/usecase/template.hwpx?url';
 import { engine, registerFont, renderDiagram, setDiagramFont } from './browser';
 
 type Tab = 'template' | 'result';
+
+const parsed = parseProfile(profileText);
+if (!parsed.profile) throw new Error(`내장 프로필 오류: ${JSON.stringify(parsed.issues)}`);
+const profile = parsed.profile;
 
 export function App() {
   const [md, setMd] = useState(mdSample);
@@ -59,7 +72,7 @@ export function App() {
   }, [template, tab]);
   useEffect(() => {
     if (!template) return;
-    previewMapping(engine, md, template)
+    previewMapping(engine, profile, md, template)
       .then(setMapping)
       .catch((e) => setStatus(`매핑 실패: ${(e as Error).message}`));
   }, [md, template]);
@@ -72,10 +85,12 @@ export function App() {
     try {
       const out = await convertBytes(engine, {
         mdName: 'input.md',
+        profile,
         mdText: md,
         template,
-        schema,
+        dataSchema: schema,
         renderDiagram: full ? renderDiagram : undefined,
+        skipDiagrams: !full, // 빠른 미리보기는 그림을 명시적으로 생략한다
         preview: false,
       });
       if (my !== seq.current) return; // 더 최근 요청이 있으면 버린다
@@ -92,7 +107,8 @@ export function App() {
       if (e instanceof ValidationError) {
         setViolations(e.violations.map((v) => `input.md:${v.line}  ${v.path}  ${v.message}`));
         setStatus(`규약 위반 ${e.violations.length}건`);
-      } else setStatus(`변환 실패: ${(e as Error).message}`);
+      } else if (e instanceof ProfileError) setStatus(`프로필 오류: ${e.issues.map((i) => i.message).join(' / ')}`);
+      else setStatus(`변환 실패: ${(e as Error).message}`);
     }
   };
 

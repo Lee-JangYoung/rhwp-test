@@ -1,16 +1,14 @@
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { formatViolations, parseMarkdown, ValidationError, validateIr } from '@yangsik/core';
-import { convert, findChromium, rhwpEngine } from '@yangsik/core/node';
+import { formatViolations, ProfileError, readMarkdown, ValidationError, validateData } from '@yangsik/core';
+import { convert, findChromium, loadProfileFile, rhwpEngine } from '@yangsik/core/node';
 
-// 문서 유형 자료는 I-2에서 프로필로 대체된다. 그전까지는 유스케이스 스키마를 기본값으로 쓴다.
-const SCHEMA = fileURLToPath(new URL('../../../templates/usecase/schema.json', import.meta.url));
-
+// 명령 체계는 I-4에서 재설계한다. 지금은 프로필(--profile)로 구동하는 최소 명령만 둔다.
 const { positionals, values } = parseArgs({
   allowPositionals: true,
   options: {
     md: { type: 'string' },
+    profile: { type: 'string' },
     template: { type: 'string' },
     out: { type: 'string' },
     preview: { type: 'string' },
@@ -31,14 +29,19 @@ async function main(): Promise<number> {
       return 0;
     }
     case 'validate': {
-      if (!values.md) throw new Error('--md 필요');
-      const ir = parseMarkdown(readFileSync(values.md, 'utf8'));
-      const vs = validateIr(ir, JSON.parse(readFileSync(SCHEMA, 'utf8')) as object);
+      if (!values.md || !values.profile) throw new Error('--md --profile 필요');
+      const loaded = loadProfileFile(values.profile);
+      if (!loaded.profile) throw new ProfileError(loaded.issues);
+      const md = readMarkdown(loaded.profile, readFileSync(values.md, 'utf8'));
+      const schema = loaded.schemaPath ? (JSON.parse(readFileSync(loaded.schemaPath, 'utf8')) as object) : undefined;
+      const vs = [...md.violations, ...(schema ? validateData(md.data, schema, md.lines, md.violations) : [])].sort(
+        (a, b) => a.line - b.line,
+      );
       if (vs.length) {
         console.error(formatViolations(values.md, vs));
         return 1;
       }
-      console.log(`OK: UC ${ir.items.length}건, 경고 ${ir.warnings.length}건`);
+      console.log(`OK: 경고 ${md.warnings.length}건`);
       return 0;
     }
     case 'analyze': {
@@ -49,20 +52,19 @@ async function main(): Promise<number> {
       return 0;
     }
     case 'convert': {
-      if (!values.md || !values.template || !values.out) throw new Error('--md --template --out 필요');
+      if (!values.md || !values.profile || !values.out) throw new Error('--md --profile --out 필요');
       try {
         const r = await convert(rhwpEngine, {
           mdPath: values.md,
-          templatePath: values.template,
+          profilePath: values.profile,
           outPath: values.out,
-          schemaPath: SCHEMA,
           skipMermaid: values['no-mermaid'],
           previewDir: values.preview,
         });
         if (values.json) console.log(JSON.stringify(r, null, 2));
         else {
           console.log(
-            `출력: ${r.out}  (${r.pages}쪽, UC ${r.items}건, 복제 ${r.cloned}, 셀 ${r.cellsSet}, 그림 ${r.imagesInserted})`,
+            `출력: ${r.out}  (${r.pages}쪽, 항목 ${r.items}건, 복제 ${r.cloned}, 셀 ${r.cellsSet}, 그림 ${r.imagesInserted})`,
           );
           for (const c of r.verify.checks)
             console.log(`  ${c.ok ? '✔' : '✘'} ${c.name}${c.detail ? ` — ${c.detail}` : ''}`);
@@ -71,7 +73,7 @@ async function main(): Promise<number> {
         }
         return r.verify.ok ? 0 : 2;
       } catch (e) {
-        if (e instanceof ValidationError) {
+        if (e instanceof ValidationError || e instanceof ProfileError) {
           console.error(e.message);
           return 1;
         }
@@ -80,7 +82,7 @@ async function main(): Promise<number> {
     }
     default:
       console.error(
-        '사용법: poc <check|validate|analyze|convert> [--md f] [--template f] [--out f] [--preview dir] [--no-mermaid] [--json]',
+        '사용법: yangsik <check|validate|analyze|convert> [--profile f] [--md f] [--template f] [--out f] [--preview dir] [--no-mermaid] [--json]',
       );
       return 1;
   }

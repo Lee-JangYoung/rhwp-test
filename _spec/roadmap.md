@@ -4,7 +4,7 @@
 |---|---|---|---|
 | 0 | 양식 확보 (HWPX 저장본, 개인정보 제거) | 스타일·필드·표 구조 확인 | 대기 (실제 양식 없음, 합성 양식으로 대체 시험) |
 | 1 | 검증 PoC (보관 브랜치 `archive/poc-final`) | [verification-spike.md](06-quality/verification-spike.md)의 핵심 항목 판정 | **완료**(rhwp 내). 한컴 열림(S-23)은 미확인 |
-| 2 | 코어 MVP + rhwp 엔진 (`packages/core`) | 프로필 기반 md → 양식 HWPX, 하드코딩 제거 | **진행 중** — I-0(기반)·I-1(이식)·I-2(프로필 형식) 완료, 단계 계획은 [07-implementation/](07-implementation/) |
+| 2 | 코어 MVP + rhwp 엔진 (`packages/core`) | 프로필 기반 md → 양식 HWPX, 하드코딩 제거 | **진행 중** — I-0(기반)·I-1(이식)·I-2(프로필 형식) 완료, I-3(프로필 기반 변환) 구현·PR 검토 중, 단계 계획은 [07-implementation/](07-implementation/) |
 | 3 | CLI + MCP + Mermaid | `convert`/`validate`/`analyze`, 에이전트 루프 | 대기 |
 | 4 | 웹 UI (React + MUI) | 프로필 선택 → 변환 → 미리보기 → 다운로드 | 후순위 |
 

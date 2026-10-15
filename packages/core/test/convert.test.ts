@@ -2,12 +2,12 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { parseMarkdown, ValidationError, validateIr } from '../src/index';
-import { convert, findChromium, rhwpEngine } from '../src/node/index';
+import { convertBytes, ValidationError, type Violation } from '../src/index';
+import { convert, findChromium, loadProfileFile, rhwpEngine } from '../src/node/index';
 
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url));
 const USECASE = join(ROOT, 'templates/usecase');
-const SCHEMA = join(USECASE, 'schema.json');
+const PROFILE = join(USECASE, 'profile.yaml');
 const TEMPLATE = join(USECASE, 'template.hwpx');
 // 이전 파일 이름 → 새 위치 (usecase-ok → example.md, usecase-bad1/2/long → fixtures/)
 const md = (n: string) =>
@@ -17,40 +17,52 @@ mkdirSync(OUT, { recursive: true });
 
 const opts = (mdName: string, out: string, extra: object = {}) => ({
   mdPath: md(mdName),
-  templatePath: TEMPLATE,
+  profilePath: PROFILE,
   outPath: join(OUT, out),
-  schemaPath: SCHEMA,
   workDir: join(OUT, 'work'),
   ...extra,
 });
 
-describe('P1 md 파싱·규약 검증', () => {
-  it('정상 문서는 위반이 없다', () => {
-    const ir = parseMarkdown(readFileSync(md('usecase-ok.md'), 'utf8'));
-    expect(ir.items.map((i) => i.id)).toEqual(['UC-001', 'UC-002', 'UC-003']);
-    expect(validateIr(ir, JSON.parse(readFileSync(SCHEMA, 'utf8')))).toEqual([]);
+/** md의 규약 위반 목록(위반이 없으면 빈 배열) */
+async function violationsOf(mdName: string): Promise<Violation[]> {
+  const l = loadProfileFile(PROFILE);
+  try {
+    await convertBytes(rhwpEngine, {
+      profile: l.profile as NonNullable<typeof l.profile>,
+      mdText: readFileSync(md(mdName), 'utf8'),
+      template: new Uint8Array(readFileSync(TEMPLATE)),
+      dataSchema: JSON.parse(readFileSync(l.schemaPath as string, 'utf8')) as object,
+      skipDiagrams: true,
+    });
+    return [];
+  } catch (e) {
+    if (e instanceof ValidationError) return e.violations;
+    throw e;
+  }
+}
+
+describe('P1 md 읽기·규약 검증', () => {
+  it('정상 문서는 위반이 없다', async () => {
+    expect(await violationsOf('usecase-ok.md')).toEqual([]);
   });
 
-  it('위반 1: ID 형식과 필수 항목 누락을 줄 번호와 함께 알려준다', () => {
-    const vs = validateIr(
-      parseMarkdown(readFileSync(md('usecase-bad1.md'), 'utf8')),
-      JSON.parse(readFileSync(SCHEMA, 'utf8')),
-    );
+  it('위반 1: ID 형식과 필수 항목 누락을 줄 번호와 함께 알려준다', async () => {
+    const vs = await violationsOf('usecase-bad1.md');
     expect(vs.map((v) => [v.line, v.path, v.message])).toEqual([
       [8, '/items/0/id', expect.stringContaining('형식 불일치')],
       [10, '/items/0/fields', '필수 항목 누락: 사후조건'],
     ]);
   });
 
-  it('위반 2: front-matter 누락·형식, 빈 흐름', () => {
-    const vs = validateIr(
-      parseMarkdown(readFileSync(md('usecase-bad2.md'), 'utf8')),
-      JSON.parse(readFileSync(SCHEMA, 'utf8')),
-    );
+  it('위반 2: front-matter 누락·형식, 필수 슬롯(기본 흐름) 누락', async () => {
+    const vs = await violationsOf('usecase-bad2.md');
     const msgs = vs.map((v) => v.message).join('|');
     expect(msgs).toContain('필수 항목 누락: author');
     expect(msgs).toContain('형식 불일치');
-    expect(vs.some((v) => v.path === '/items/0/flows/main' && v.line === 7)).toBe(true);
+    // 구조 검증(프로필의 md 규칙)이 먼저: 기본 흐름이 없음 → 항목 제목 줄(7)
+    expect(
+      vs.some((v) => v.path === '/items/0/main' && v.line === 7 && v.message.startsWith('필수 항목 누락: main')),
+    ).toBe(true);
   });
 
   it('위반 문서는 변환을 거부한다', async () => {
@@ -95,15 +107,22 @@ describe('P2·P3·P5 필드 채움, 반복 블록, 저장 검증', () => {
       cwd: join(ROOT, 'packages/core'),
       env: { ...process.env, TABLE_INLINE: '1' },
     });
-    const r = await convert(rhwpEngine, {
-      ...opts('usecase-long.md', 'long-inline.hwpx', { skipMermaid: true }),
-      templatePath: inline,
+    const l = loadProfileFile(PROFILE);
+    const { report: r } = await convertBytes(rhwpEngine, {
+      profile: l.profile as NonNullable<typeof l.profile>,
+      mdText: readFileSync(md('usecase-long.md'), 'utf8'),
+      template: new Uint8Array(readFileSync(inline)),
+      dataSchema: JSON.parse(readFileSync(l.schemaPath as string, 'utf8')) as object,
+      skipDiagrams: true,
     });
     expect(r.pages).toBe(1); // 긴 표가 한 쪽에 넘쳐 그려진다 (떠 있는 표는 3쪽으로 이어짐)
   });
 
   it('표 높이 맞춤을 끄면 자체 검증이 낡은 높이를 잡는다', async () => {
-    const r = await convert(rhwpEngine, opts('usecase-ok.md', 'stale.hwpx', { skipMermaid: true, fitHeights: false }));
+    const r = await convert(
+      rhwpEngine,
+      opts('usecase-ok.md', 'stale.hwpx', { skipMermaid: true, output: { fitHeights: false } }),
+    );
     const c = r.verify.checks.find((x) => x.name.startsWith('표 저장 높이'));
     expect(c?.ok).toBe(false);
   });
