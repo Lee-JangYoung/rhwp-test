@@ -11,7 +11,8 @@ import {
   type Issue,
 } from '@yangsik/core';
 import { testProfile } from '@yangsik/hwp';
-import { loadProfileFile, renderMermaid } from '@yangsik/core/node';
+import { loadProfileFile } from '@yangsik/core/node';
+import { renderMermaid } from '@yangsik/diagram/node';
 import { rhwpEngine } from '@yangsik/engine-rhwp/node';
 import { EXIT, formatIssues, type Out, readBytes, readText, UsageError } from '../util';
 

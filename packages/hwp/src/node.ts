@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { type ConvertReport, convertBytes, type DiagramRenderer, type OutputFormat, ProfileError } from './convert';
 import { type DocumentEngine, type Profile } from '@yangsik/core';
-import { loadProfileFile, renderMermaid } from '@yangsik/core/node';
+import { loadProfileFile } from '@yangsik/core/node';
+import { renderMermaid } from '@yangsik/diagram/node';
 
 export { ProfileError, ValidationError } from './convert';
 

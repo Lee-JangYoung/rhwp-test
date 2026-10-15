@@ -277,6 +277,9 @@ importers:
       '@yangsik/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@yangsik/diagram':
+        specifier: workspace:*
+        version: link:../../packages/diagram
       '@yangsik/engine-rhwp':
         specifier: workspace:*
         version: link:../../packages/engine-rhwp
@@ -299,6 +302,9 @@ importers:
       '@yangsik/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@yangsik/diagram':
+        specifier: workspace:*
+        version: link:../../packages/diagram
       '@yangsik/engine-rhwp':
         specifier: workspace:*
         version: link:../../packages/engine-rhwp
@@ -410,12 +416,15 @@ importers:
         specifier: 'catalog:'
         version: 2.9.1
     devDependencies:
-      '@mermaid-js/mermaid-cli':
-        specifier: 'catalog:'
-        version: 12.0.0(@babel/template@7.29.7)(@types/react@19.3.0)(puppeteer@25.13.0)(tailwindcss@4.3.3)
       tsx:
         specifier: 'catalog:'
         version: 4.23.15
+
+  packages/diagram:
+    devDependencies:
+      '@mermaid-js/mermaid-cli':
+        specifier: 'catalog:'
+        version: 12.0.0(@babel/template@7.29.7)(@types/react@19.3.0)(puppeteer@25.13.0)(tailwindcss@4.3.3)
 
   packages/engine-rhwp:
     dependencies:
@@ -431,6 +440,9 @@ importers:
       '@yangsik/core':
         specifier: workspace:*
         version: link:../core
+      '@yangsik/diagram':
+        specifier: workspace:*
+        version: link:../diagram
     devDependencies:
       '@yangsik/engine-rhwp':
         specifier: workspace:*
@@ -444,6 +456,9 @@ importers:
       '@yangsik/core':
         specifier: workspace:*
         version: link:../packages/core
+      '@yangsik/diagram':
+        specifier: workspace:*
+        version: link:../packages/diagram
       '@yangsik/engine-rhwp':
         specifier: workspace:*
         version: link:../packages/engine-rhwp

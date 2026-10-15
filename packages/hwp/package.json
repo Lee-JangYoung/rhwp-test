@@ -12,7 +12,8 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@yangsik/core": "workspace:*"
+    "@yangsik/core": "workspace:*",
+    "@yangsik/diagram": "workspace:*"
   },
   "devDependencies": {
     "@yangsik/engine-rhwp": "workspace:*"

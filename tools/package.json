@@ -16,6 +16,7 @@
   "dependencies": {
     "@yangsik/author": "workspace:*",
     "@yangsik/core": "workspace:*",
+    "@yangsik/diagram": "workspace:*",
     "@yangsik/engine-rhwp": "workspace:*",
     "@yangsik/hwp": "workspace:*"
   },

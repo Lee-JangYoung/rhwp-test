@@ -4,7 +4,7 @@
 
 나중에 라이브러리를 바꿔도 코어가 흔들리지 않도록, 문서를 열고 편집·저장하는 부분을 **엔진 인터페이스**로 분리한다. 첫 구현체는 rhwp다. 코어는 이 인터페이스만 알고 `@rhwp/core`를 import하지 않는다(import는 `engines/rhwp`에서만).
 
-## 인터페이스 (현재: `packages/core/src/engine/types.ts`)
+## 인터페이스 (현재: `packages/core/src/engine/types.ts`, rhwp 구현: `packages/engine-rhwp`)
 코어가 쓰는 연산만 둔다. 위치는 `TableRef{para, ctrl}`로 표현하고 구역·오프셋은 엔진 안에 둔다. 채움형 변환([ADR-0012](../adr/0012-repeat-block-by-table-clone.md))에 필요한 연산으로 확정됐고, 처음 제안했던 `appendParagraph`·`appendTable` 같은 문서 조립형 연산은 쓰지 않는다.
 
 ```ts

@@ -6,7 +6,7 @@
 실제 SI 양식을 받으면 같은 절차로 등록·변환할 수 있게 하고, S-23(한컴에서 열림·표시)을 **사람이 최소 노력으로 확인**하도록 재료를 준비한다.
 
 ## 작업과 결과
-1. 한컴 확인 키트: `pnpm --filter @yangsik/core kit:hancom`(`packages/core/scripts/hancom-kit.ts`)이 산출물 7개(유스케이스 기본·긴 표·표 높이 맞춤 없음(비교용)·글자처럼 취급 표, 클래스·DB 명세서, 토큰·문단 보고서), 양식 원본, 점검표(`CHECKLIST.md`), 결과 기록 양식(`RESULT.md`), `MANIFEST.json`(SHA-256·쪽수·자체 검증), rhwp 쪽별 SVG를 `out/hancom-kit/`에 만든다. 스냅샷(쪽별 SVG 제외)을 [06-quality/hancom-kit](../06-quality/hancom-kit/README.md)에 커밋했다.
+1. 한컴 확인 키트: `pnpm --filter @yangsik/core kit:hancom`(`packages/core/scripts/hancom-kit.ts`)이 산출물 7개(유스케이스 기본·긴 표·표 높이 맞춤 없음(비교용)·글자처럼 취급 표, 클래스·DB 명세서, 토큰·문단 보고서), 양식 원본, 점검표(`CHECKLIST.md`), 결과 기록 양식(`RESULT.md`), `MANIFEST.json`(SHA-256·쪽수·자체 검증), rhwp 쪽별 SVG를 `out/hancom-kit/`에 만든다. 스냅샷(쪽별 SVG 제외)을 [06-quality/hancom-kit](../../kit/hancom/README.md)에 커밋했다.
 2. 양식 등록 절차 문서: [registering-a-template.md](../04-conversion/registering-a-template.md).
 3. 판정 기준(제안): 합격(열림 오류 없음·쪽수 같음·값·표·그림이 눈으로 같음) / 보류(표 높이·쪽 경계·간격 차이) / 불합격(열림 오류·값 누락). 개발자 승인 필요.
 

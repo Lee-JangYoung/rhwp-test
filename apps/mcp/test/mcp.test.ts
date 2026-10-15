@@ -232,7 +232,7 @@ describe('MCP 서버: stdio 실행(실제 프로세스)', () => {
 import { spawnSync } from 'node:child_process';
 import { copyFileSync, mkdirSync, symlinkSync } from 'node:fs';
 import { createServer as createHttpServer } from 'node:http';
-import { findChromium } from '@yangsik/core/node';
+import { findChromium } from '@yangsik/diagram/node';
 import { zipEntryHashes } from '../../../packages/hwp/test/util/zip';
 
 /** 허용 폴더(root)와 그 밖(outside)을 가진 시험 환경. root 안에 유스케이스 문서 유형을 복사해 둔다 */

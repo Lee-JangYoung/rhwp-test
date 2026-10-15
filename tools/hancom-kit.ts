@@ -7,7 +7,8 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { convertBytes } from '@yangsik/hwp';
-import { findChromium, loadProfileFile, renderMermaid } from '@yangsik/core/node';
+import { loadProfileFile } from '@yangsik/core/node';
+import { findChromium, renderMermaid } from '@yangsik/diagram/node';
 import { rhwpEngine } from '@yangsik/engine-rhwp/node';
 
 const root = (p: string) => fileURLToPath(new URL(`../${p}`, import.meta.url));

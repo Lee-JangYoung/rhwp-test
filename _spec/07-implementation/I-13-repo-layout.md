@@ -1,6 +1,6 @@
 # I-13 패키지·폴더 재편
 
-상태: **S1 완료, S2~S4 진행 예정**(개발자 승인: S1 "진행"). 결정: [ADR-0020](../adr/0020-package-restructure.md)(개발자 승인: 권장안 D1~D5). 선행: I-10. 후행: I-11, I-12(새 패키지가 처음부터 올바른 자리에 들어가도록 먼저 한다).
+상태: **구현 완료**(S1~S4, 개발자 승인: "일단 정해진 것부터 처리"). 웹 기능 정리와 Docker 배포는 이 단계 밖(별도 계획). 결정: [ADR-0020](../adr/0020-package-restructure.md)(개발자 승인: 권장안 D1~D5). 선행: I-10. 후행: I-11, I-12(새 패키지가 처음부터 올바른 자리에 들어가도록 먼저 한다).
 
 ## 목표
 동작을 바꾸지 않고 패키지와 폴더를 [ADR-0020](../adr/0020-package-restructure.md)의 구조로 옮긴다.
@@ -65,3 +65,9 @@ tools/    개발 도구      kit/hancom/  확인 키트      templates/  문서 
 - 소비자(cli·mcp·web·author·tools)를 새 import로 수정. `author`는 `hwp`에 런타임 의존.
 - 시험 이전: 엔진이 필요한 변환 시험 7개 파일과 `golden`·`util`은 `hwp/test`로, `profile.test`는 순수 부분(스키마·kind 목록·가이드·kind 등록)은 `core`에, 양식 점검·양식 분석은 `hwp/test/profile-check.test.ts`로 분할. `core` 시험은 더 이상 엔진을 import하지 않는다. S1·S2의 임시 상대 경로 import 해소. 시험 +2(`hwp/test/api.test.ts`, 경계 시험 1건 추가), 총 171개.
 - 확인: `pnpm check`, 웹 e2e 4개, 키트 SHA-256·쪽 수 동일.
+
+## S4 결과
+- `packages/diagram` 신설: `mermaid.ts` → `src/node.ts`(`/node`: `renderMermaid`, `findChromium`, `safeFileName`). `@mermaid-js/mermaid-cli`는 `diagram`의 선택적 peer·devDependency로 이동(`core`에서 제거). `hwp`는 Node 변환에서 `diagram`을 쓰므로 `dependencies`는 `core`·`diagram`. Mermaid 파일 이름 시험은 `diagram/test`로 이동.
+- 경계 시험 갱신: `core`·`diagram`은 다른 `@yangsik` 패키지에 의존하지 않음.
+- 문서 갱신: `architecture.md`(패키지·의존 방향 표), `engine-interface.md`, `_spec/README.md`, 루트 `README.md`, 깨진 링크 1건(I-6 → `kit/hancom`) 수정. 최종 시험 171개.
+- 확인(S1~S4 공통): `pnpm check`, 웹 e2e 4개, 확인 키트 SHA-256·쪽 수 동일, 생성기 재실행 시 산출물 불변.

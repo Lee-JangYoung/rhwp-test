@@ -21,16 +21,7 @@
     "unified": "catalog:",
     "yaml": "catalog:"
   },
-  "peerDependencies": {
-    "@mermaid-js/mermaid-cli": "catalog:"
-  },
-  "peerDependenciesMeta": {
-    "@mermaid-js/mermaid-cli": {
-      "optional": true
-    }
-  },
   "devDependencies": {
-    "@mermaid-js/mermaid-cli": "catalog:",
     "tsx": "catalog:"
   }
 }

@@ -1,4 +1,4 @@
-import { findChromium } from '@yangsik/core/node';
+import { findChromium } from '@yangsik/diagram/node';
 import { rhwpEngine } from '@yangsik/engine-rhwp/node';
 import { EXIT, type Out } from '../util';
 

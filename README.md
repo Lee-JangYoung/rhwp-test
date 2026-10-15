@@ -24,7 +24,10 @@ pnpm --filter @yangsik/web test:e2e
 
 | 경로 | 내용 |
 |---|---|
-| `packages/core` | `@yangsik/core` — 환경 독립 변환 코어. Node 전용은 `@yangsik/core/node` |
+| `packages/core` | `@yangsik/core` — md 읽기·프로필 점검·데이터 트리·엔진 인터페이스(환경 독립, rhwp를 모름). Node 전용은 `@yangsik/core/node` |
+| `packages/engine-rhwp` | `@yangsik/engine-rhwp` — rhwp(`@rhwp/core` 고정) 엔진 구현, Node 로더 |
+| `packages/hwp` | `@yangsik/hwp` — 양식 채움 변환(HWPX)·HWP 5.0 저장·자체 검증. 엔진은 주입 |
+| `packages/diagram` | `@yangsik/diagram` — Mermaid 렌더(Node, 격리) |
 | `packages/author` | `@yangsik/author` — 양식 등록 단계의 LLM 연결(프로필 생성·검토), LangChain 기반 |
 | `apps/cli` | `@yangsik/cli` — 명령줄 |
 | `apps/mcp` | `@yangsik/mcp` — MCP 서버(stdio): 프로필 작성·검증·변환 도구 12개 |

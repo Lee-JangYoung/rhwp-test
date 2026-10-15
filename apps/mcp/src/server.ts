@@ -17,7 +17,8 @@ import {
   validateData,
 } from '@yangsik/core';
 import { convertBytes, ProfileError, previewMapping, testProfile, ValidationError } from '@yangsik/hwp';
-import { findChromium, loadProfileFile, renderMermaid } from '@yangsik/core/node';
+import { loadProfileFile } from '@yangsik/core/node';
+import { findChromium, renderMermaid } from '@yangsik/diagram/node';
 import { hwpPathOf } from '@yangsik/hwp/node';
 import { rhwpEngine } from '@yangsik/engine-rhwp/node';
 import { z } from 'zod';

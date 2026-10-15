@@ -4,14 +4,20 @@
 
 ## 패키지
 
-| 패키지 | 책임 |
-|---|---|
-| `core` | md 읽기(`markdown/`), 프로필 형식·점검·가이드(`profile/`), 변환·자체 검증(`convert/`), 엔진 인터페이스와 rhwp 구현(`engine/`). 환경 독립. Node 전용(파일 변환, WASM 로드, Mermaid)은 `@yangsik/core/node` |
-| `author` | 양식 등록 단계의 LLM 연결(프로필 생성·검토, LangChain). **LLM 의존은 여기에만** |
-| `cli` | `node:util.parseArgs` 어댑터. 파일 I/O, 종료 코드, 보고서. 필수 의존에 LLM 라이브러리 없음 |
-| `mcp` | LLM 에이전트용 도구(stdio). 허용 폴더(`PathGuard`) 제한. 서버는 LLM을 부르지 않음 |
-| `web` | React + MUI. 브라우저 안에서 변환, `@rhwp/editor`로 표시 |
-| (계획) `erd`, `export` | ERD PNG, Office 출력 — [ADR-0019](../adr/0019-multi-format-output.md), [I-11](../07-implementation/I-11-erd.md)·[I-12](../07-implementation/I-12-office-export.md) |
+| 경로 | 패키지 | 책임 | rhwp |
+|---|---|---|---|
+| `packages/core` | `core` | md 읽기, 프로필 형식·점검·가이드, 데이터 트리, 엔진 인터페이스(타입), 프로필 파일 읽기(`/node`) | 모름 |
+| `packages/engine-rhwp` | `engine-rhwp` | rhwp 엔진 구현, Node 로더(`/node`). `@rhwp/core`를 여기서만 고정 의존([ADR-0005](../adr/0005-pin-rhwp-and-isolate-adapter.md)) | 의존 |
+| `packages/hwp` | `hwp` | 양식 채움 변환, HWPX/HWP 저장, 자체 검증, Node 파일 변환(`/node`). 엔진은 주입 | 주입 |
+| `packages/diagram` | `diagram` | Mermaid 렌더(Node, 격리). 이후 ERD 렌더 합류 | 모름 |
+| `packages/author` | `author` | 양식 등록 단계의 LLM 연결(프로필 생성·검토, LangChain). **LLM 의존은 여기에만** | 모름 |
+| `apps/cli` | `cli` | `node:util.parseArgs` 어댑터. 파일 I/O, 종료 코드, 보고서. 필수 의존에 LLM 라이브러리 없음 | — |
+| `apps/mcp` | `mcp` | LLM 에이전트용 도구(stdio). 허용 폴더(`PathGuard`) 제한. 서버는 LLM을 부르지 않음 | — |
+| `apps/web` | `web` | React + MUI. 브라우저 안에서 변환, `@rhwp/editor`로 표시. 브라우저용 WASM 초기화는 여기 | — |
+| (계획) `packages/erd`, `packages/export` | | ERD PNG, Office 출력 — [ADR-0019](../adr/0019-multi-format-output.md), [I-11](../07-implementation/I-11-erd.md)·[I-12](../07-implementation/I-12-office-export.md) | 모름 |
+| `tools/`, `kit/` | | 개발 도구(생성기, 한컴 확인 키트 생성기), 한컴에서 열어 볼 키트 산출물 | — |
+
+**의존 방향은 단방향**이다([ADR-0020](../adr/0020-package-restructure.md)): `core`는 다른 패키지를 모르고, `engine-rhwp`·`hwp`·`diagram`은 `core`만 알며(`hwp`는 Node 변환에서 `diagram`도), `apps`가 조립한다. 경계는 시험이 지킨다(`engine-rhwp/test/boundaries.test.ts`).
 
 스택: TypeScript 7, Node 24 LTS, pnpm 12 workspace, Biome, Vitest, Playwright, remark/unified, yaml, Ajv, Vite, React 19 + MUI 9. 버전은 정확히 고정([ADR-0013](../adr/0013-runtime-and-package-manager.md)). 프로필 저장·관리와 다중 사용자(서버)는 미결.
 
@@ -42,7 +48,7 @@
 | 다이어그램 | mermaid-cli(격리: strict, 네트워크 차단) | 브라우저 mermaid |
 | 파일 | `fs` | `File`/`fetch` |
 
-환경 차이는 **엔진 팩토리와 렌더러 주입**으로 푼다([ADR-0011](../adr/0011-core-adapter-split-by-injection.md)): `createRhwpEngine(init)`, `convertBytes(engine, {…, renderDiagram?, formats?})`.
+환경 차이는 **엔진 팩토리와 렌더러 주입**으로 푼다([ADR-0011](../adr/0011-core-adapter-split-by-injection.md)): `createRhwpEngine(init)`(`engine-rhwp`), `convertBytes(engine, {…, renderDiagram?, formats?})`(`hwp`).
 
 ## 오류 원칙
 - 프로필·md 문제는 **변환 전에** 코드·경로·줄·후보와 함께 막는다(점검=변환). 정책(`policy`)에 따라 경고로 낮출 수 있다.
