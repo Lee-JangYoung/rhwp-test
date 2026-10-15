@@ -1,5 +1,4 @@
-import type { CellInfo, DocumentSession, TableRef } from '../engine/types';
-
+import { type CellInfo, type DocumentSession, type TableRef } from '@yangsik/core';
 export interface LabelOptions {
   /** 라벨이 있는 열(기본 0) */
   labelColumn?: number;

@@ -58,3 +58,10 @@ tools/    개발 도구      kit/hancom/  확인 키트      templates/  문서 
 - `core` 시험은 아직 엔진이 필요해 `../../engine-rhwp/src/node`를 상대 경로로 import한다(워크스페이스 순환 의존을 피하려고). S3에서 `hwp`로 옮기며 해소.
 - 시험 +2 (`engine-rhwp/test/boundaries.test.ts`): `@rhwp/core` 의존은 `engine-rhwp`·웹뿐, `core` 소스는 `@rhwp/core`를 import하지 않음. 총 169개.
 - 확인: `pnpm check`, 웹 e2e 4개, 키트 SHA-256·쪽 수 동일.
+
+## S3 결과
+- `packages/hwp` 신설: `convert/*`와 `node/convert-file`을 이동(`src/convert.ts`·`blocks`·`mapping`·`resolve`·`test-profile`·`values`·`verify`, `/node`는 `src/node.ts`). 공개 API: `convertBytes`, `previewMapping`, `testProfile`, `ProfileError`, `ValidationError`와 타입, `/node`의 `convert`, `hwpPathOf`. `hwp`의 `dependencies`는 `@yangsik/core`뿐이고 엔진은 주입받는다(`engine-rhwp`는 시험용 devDependency).
+- `core`는 변환 API를 잃고, `hwp`가 쓰는 `closest`와 타입(`Format`, `Policy`, `ValueSpec`)을 내보낸다. 레지스트리·예제 상수는 시험·도구용 서브패스 `@yangsik/core/kinds`로 노출.
+- 소비자(cli·mcp·web·author·tools)를 새 import로 수정. `author`는 `hwp`에 런타임 의존.
+- 시험 이전: 엔진이 필요한 변환 시험 7개 파일과 `golden`·`util`은 `hwp/test`로, `profile.test`는 순수 부분(스키마·kind 목록·가이드·kind 등록)은 `core`에, 양식 점검·양식 분석은 `hwp/test/profile-check.test.ts`로 분할. `core` 시험은 더 이상 엔진을 import하지 않는다. S1·S2의 임시 상대 경로 import 해소. 시험 +2(`hwp/test/api.test.ts`, 경계 시험 1건 추가), 총 171개.
+- 확인: `pnpm check`, 웹 e2e 4개, 키트 SHA-256·쪽 수 동일.

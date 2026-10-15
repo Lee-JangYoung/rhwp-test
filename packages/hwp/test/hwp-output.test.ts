@@ -2,9 +2,10 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { verifyHwp } from '../src/convert/verify';
-import { convertBytes, type Profile, parseProfile } from '../src/index';
-import { rhwpEngine } from '../../engine-rhwp/src/node';
+import { verifyHwp } from '../src/verify';
+import { type Profile, parseProfile } from '@yangsik/core';
+import { convertBytes } from '../src/index';
+import { rhwpEngine } from '@yangsik/engine-rhwp/node';
 import { fakeDiagram } from './util/zip';
 
 const at = (p: string) => fileURLToPath(new URL(p, import.meta.url));

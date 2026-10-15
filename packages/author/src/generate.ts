@@ -2,7 +2,6 @@ import {
   analyzeTemplate,
   checkProfile,
   describeKinds,
-  type DiagramRenderer,
   type DocumentEngine,
   getProfileGuide,
   GUIDE_TOPICS,
@@ -10,12 +9,10 @@ import {
   type Issue,
   type Profile,
   parseProfile,
-  previewMapping,
-  type ProfileTestResult,
   readMarkdown,
   type TemplateFacts,
-  testProfile,
 } from '@yangsik/core';
+import { type DiagramRenderer, previewMapping, type ProfileTestResult, testProfile } from '@yangsik/hwp';
 import YAML from 'yaml';
 import type { ChatMessage, LlmClient, LlmRequest, LlmResponse, ToolCall, ToolDef, Usage } from './llm';
 import { buildResponseSchema, buildSystemPrompt, buildUserPrompt, PROMPT_VERSION, TOOLS } from './prompt';

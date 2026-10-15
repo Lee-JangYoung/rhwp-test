@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, join } from 'node:path';
-import { type ConvertReport, type OutputFormat, ProfileError, ValidationError } from '@yangsik/core';
-import { convert } from '@yangsik/core/node';
+import { type ConvertReport, type OutputFormat, ProfileError, ValidationError } from '@yangsik/hwp';
+import { convert } from '@yangsik/hwp/node';
 import { rhwpEngine } from '@yangsik/engine-rhwp/node';
 import { EXIT, formatIssues, inputErrorMessage, type Out, UsageError, worst } from '../util';
 

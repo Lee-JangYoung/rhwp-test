@@ -1,4 +1,4 @@
-import type { DocumentEngine, DocumentSession, PageBreakMode } from '../engine/types';
+import { type DocumentEngine, type DocumentSession, type PageBreakMode } from '@yangsik/core';
 import { type LabelOptions, readBlock } from './blocks';
 
 export interface Check {

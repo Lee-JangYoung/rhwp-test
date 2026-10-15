@@ -30,6 +30,12 @@ describe('패키지 경계 (ADR-0020)', () => {
     expect(users.sort()).toEqual(['apps/web', 'packages/engine-rhwp']);
   });
 
+  it('core는 다른 @yangsik 패키지에, hwp는 engine-rhwp에 의존하지 않는다 (시험의 devDependency만 예외)', () => {
+    const own = (d: string) => Object.keys(pkg(d).dependencies ?? {}).filter((n) => n.startsWith('@yangsik/'));
+    expect(own('packages/core')).toEqual([]);
+    expect(own('packages/hwp')).toEqual(['@yangsik/core']);
+  });
+
   it('core 소스는 @rhwp/core를 import하지 않는다', () => {
     const offenders = sources(join(ROOT, 'packages/core/src')).filter((f) =>
       /from\s+'@rhwp\/core/.test(readFileSync(f, 'utf8')),

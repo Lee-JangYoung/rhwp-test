@@ -21,20 +21,15 @@ import {
   Typography,
   createTheme,
 } from '@mui/material';
+import { checkProfile, type Issue, parseProfile, type Profile, readMarkdown, validateData } from '@yangsik/core';
 import {
-  checkProfile,
   convertBytes,
   type ConvertReport,
-  type Issue,
   type MappingPreview,
-  parseProfile,
-  type Profile,
   previewMapping,
   ProfileError,
-  readMarkdown,
-  validateData,
   ValidationError,
-} from '@yangsik/core';
+} from '@yangsik/hwp';
 import { engine, registerFont, renderDiagram, setDiagramFont } from './browser';
 import { DOCTYPES, loadTemplateBytes } from './doctypes';
 import { MappingPanel, ProfileIssues, ReportPanel, Section } from './panels';

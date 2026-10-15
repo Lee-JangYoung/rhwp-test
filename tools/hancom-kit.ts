@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { convertBytes } from '@yangsik/core';
+import { convertBytes } from '@yangsik/hwp';
 import { findChromium, loadProfileFile, renderMermaid } from '@yangsik/core/node';
 import { rhwpEngine } from '@yangsik/engine-rhwp/node';
 

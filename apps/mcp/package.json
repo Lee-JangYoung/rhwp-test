@@ -19,6 +19,7 @@
     "@modelcontextprotocol/sdk": "catalog:",
     "@yangsik/core": "workspace:*",
     "@yangsik/engine-rhwp": "workspace:*",
+    "@yangsik/hwp": "workspace:*",
     "tsx": "catalog:",
     "zod": "catalog:"
   }

@@ -12,7 +12,8 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
-import type { ConvertReport, Issue, MappingPreview } from '@yangsik/core';
+import type { Issue } from '@yangsik/core';
+import type { ConvertReport, MappingPreview } from '@yangsik/hwp';
 import type { ReactNode } from 'react';
 
 /** 접을 수 있는 구역(접어도 내용은 DOM에 남는다) */

@@ -1,6 +1,4 @@
-import type { DocumentSession, TableRef } from '../engine/types';
-import type { Locator } from '../profile/types';
-
+import { type DocumentSession, type Locator, type TableRef } from '@yangsik/core';
 type Cand<T> = { ref: TableRef; index: number; item: T };
 
 /**

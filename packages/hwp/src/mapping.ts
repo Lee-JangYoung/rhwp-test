@@ -1,6 +1,11 @@
-import type { DocumentEngine } from '../engine/types';
-import { readMarkdown } from '../markdown/read';
-import type { Binding, Locator, Profile, ValueSpec } from '../profile/types';
+import {
+  type Binding,
+  type DocumentEngine,
+  type Locator,
+  type Profile,
+  readMarkdown,
+  type ValueSpec,
+} from '@yangsik/core';
 import { labelCells } from './blocks';
 import { findTablesIn } from './resolve';
 import { getPath, type Scopes, resolveValue } from './values';

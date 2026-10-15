@@ -6,7 +6,6 @@ import {
   analyzeTemplate,
   buildProfileSchema,
   checkProfile,
-  convertBytes,
   describeKinds,
   formatViolations,
   GUIDE_TOPICS,
@@ -14,14 +13,12 @@ import {
   getProfileGuide,
   type Issue,
   type Profile,
-  ProfileError,
-  previewMapping,
   readMarkdown,
-  testProfile,
-  ValidationError,
   validateData,
 } from '@yangsik/core';
-import { findChromium, hwpPathOf, loadProfileFile, renderMermaid } from '@yangsik/core/node';
+import { convertBytes, ProfileError, previewMapping, testProfile, ValidationError } from '@yangsik/hwp';
+import { findChromium, loadProfileFile, renderMermaid } from '@yangsik/core/node';
+import { hwpPathOf } from '@yangsik/hwp/node';
 import { rhwpEngine } from '@yangsik/engine-rhwp/node';
 import { z } from 'zod';
 import { PathGuard } from './paths';

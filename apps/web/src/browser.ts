@@ -2,7 +2,7 @@
 import init from '@rhwp/core';
 import wasmUrl from '@rhwp/core/rhwp_bg.wasm?url';
 import mermaid from 'mermaid';
-import type { DiagramRenderer } from '@yangsik/core';
+import type { DiagramRenderer } from '@yangsik/hwp';
 import { createRhwpEngine } from '@yangsik/engine-rhwp';
 
 export const engine = createRhwpEngine(async () => {

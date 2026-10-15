@@ -1,9 +1,20 @@
-import type { DocumentEngine, TableRef } from '../engine/types';
-import { readMarkdown } from '../markdown/read';
-import { formatViolations, type Violation, validateData } from '../markdown/validate';
-import { checkProfile } from '../profile/check';
-import { closest, type Issue } from '../profile/issues';
-import type { Binding, Format, Locator, Policy, Profile, ValueSpec } from '../profile/types';
+import {
+  type Binding,
+  checkProfile,
+  closest,
+  type DocumentEngine,
+  type Format,
+  formatViolations,
+  type Issue,
+  type Locator,
+  type Policy,
+  type Profile,
+  readMarkdown,
+  type TableRef,
+  validateData,
+  type ValueSpec,
+  type Violation,
+} from '@yangsik/core';
 import { duplicateLabels, type LabelOptions, labelCells } from './blocks';
 import { formatValue, getPath, resolveValue, type Scopes } from './values';
 import { type Expected, type HwpVerifyReport, type VerifyReport, verifyHwp, verifyOutput } from './verify';

@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { convertBytes, parseProfile, previewMapping, ProfileError, type Profile, testProfile } from '../src/index';
-import { createBlankDoc, rhwpEngine } from '../../engine-rhwp/src/node';
+import { parseProfile, type Profile } from '@yangsik/core';
+import { convertBytes, previewMapping, ProfileError, testProfile } from '../src/index';
+import { createBlankDoc, rhwpEngine } from '@yangsik/engine-rhwp/node';
 import { fakeDiagram } from './util/zip';
 
 const at = (p: string) => fileURLToPath(new URL(p, import.meta.url));

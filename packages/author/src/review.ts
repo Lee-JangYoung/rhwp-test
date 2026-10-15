@@ -1,4 +1,5 @@
-import type { Binding, Issue, Locator, MappingPreview, Profile, ProfileTestResult, TemplateFacts } from '@yangsik/core';
+import type { Binding, Issue, Locator, Profile, TemplateFacts } from '@yangsik/core';
+import type { MappingPreview, ProfileTestResult } from '@yangsik/hwp';
 import type { Attempt, StopReason } from './generate';
 import type { Capability, Usage } from './llm';
 

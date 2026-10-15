@@ -9,8 +9,8 @@ import {
   GUIDE_TOPICS,
   type GuideTopic,
   type Issue,
-  testProfile,
 } from '@yangsik/core';
+import { testProfile } from '@yangsik/hwp';
 import { loadProfileFile, renderMermaid } from '@yangsik/core/node';
 import { rhwpEngine } from '@yangsik/engine-rhwp/node';
 import { EXIT, formatIssues, type Out, readBytes, readText, UsageError } from '../util';

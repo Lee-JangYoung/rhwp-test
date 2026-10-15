@@ -1,5 +1,4 @@
-import type { Format, ValueSpec } from '../profile/types';
-
+import { type Format, type ValueSpec } from '@yangsik/core';
 /** 데이터 범위(가까운 것부터). repeat 안에서는 [항목, ...바깥 범위, 전체 데이터] */
 export type Scopes = Record<string, unknown>[];
 

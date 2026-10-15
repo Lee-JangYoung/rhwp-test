@@ -2,9 +2,11 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { convertBytes, ValidationError, type Violation } from '../src/index';
-import { convert, findChromium, loadProfileFile, renderMermaid, safeFileName } from '../src/node/index';
-import { rhwpEngine } from '../../engine-rhwp/src/node';
+import { type Violation } from '@yangsik/core';
+import { convertBytes, ValidationError } from '../src/index';
+import { findChromium, loadProfileFile, renderMermaid, safeFileName } from '@yangsik/core/node';
+import { convert } from '../src/node';
+import { rhwpEngine } from '@yangsik/engine-rhwp/node';
 
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url));
 const USECASE = join(ROOT, 'templates/usecase');

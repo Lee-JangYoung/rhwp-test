@@ -1,8 +1,11 @@
-import type { DocumentEngine } from '../engine/types';
-import type { Violation } from '../markdown/read';
-import { checkProfile, type CheckResult } from '../profile/check';
-import type { Issue } from '../profile/issues';
-import type { Profile } from '../profile/types';
+import {
+  checkProfile,
+  type CheckResult,
+  type DocumentEngine,
+  type Issue,
+  type Profile,
+  type Violation,
+} from '@yangsik/core';
 import { type ConvertReport, convertBytes, type DiagramRenderer, ProfileError, ValidationError } from './convert';
 import { type MappingPreview, previewMapping } from './mapping';
 

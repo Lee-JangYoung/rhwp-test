@@ -1,19 +1,11 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import {
-  type ConvertReport,
-  convertBytes,
-  type DiagramRenderer,
-  type OutputFormat,
-  ProfileError,
-} from '../convert/convert';
-import type { DocumentEngine } from '../engine/types';
-import type { Profile } from '../profile/types';
-import { renderMermaid } from './mermaid';
-import { loadProfileFile } from './profile-file';
+import { type ConvertReport, convertBytes, type DiagramRenderer, type OutputFormat, ProfileError } from './convert';
+import { type DocumentEngine, type Profile } from '@yangsik/core';
+import { loadProfileFile, renderMermaid } from '@yangsik/core/node';
 
-export { ProfileError, ValidationError } from '../convert/convert';
+export { ProfileError, ValidationError } from './convert';
 
 export interface ConvertOptions {
   mdPath: string;

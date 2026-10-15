@@ -2,7 +2,7 @@ export { analyzeTemplate } from './analyze';
 export type { TemplateFacts } from './analyze';
 export { checkProfile } from './check';
 export type { CheckResult } from './check';
-export { ISSUE_CODES } from './issues';
+export { closest, ISSUE_CODES } from './issues';
 export type { Issue, IssueCode } from './issues';
 export { parseProfile } from './parse';
 export type { ParseResult } from './parse';
