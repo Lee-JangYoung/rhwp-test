@@ -27,6 +27,7 @@ pnpm --filter @yangsik/web test:e2e
 | `packages/core` | `@yangsik/core` — 환경 독립 변환 코어. Node 전용은 `@yangsik/core/node` |
 | `packages/author` | `@yangsik/author` — 양식 등록 단계의 LLM 연결(프로필 생성·검토), LangChain 기반 |
 | `templates/` | 문서 유형 폴더(프로필·합성 양식·규약·예제): usecase, class-spec, db-spec, report |
+| `packages/mcp` | `@yangsik/mcp` — MCP 서버(stdio): 프로필 작성·검증·변환 도구 12개 |
 | `packages/cli` | `@yangsik/cli` — 명령줄 |
 | `packages/web` | `@yangsik/web` — React 웹 PoC(`@rhwp/editor`), I-8에서 MUI로 재구성 |
 | `templates/usecase` | 첫 문서 유형 자료(스키마·합성 양식·예제 md) |
