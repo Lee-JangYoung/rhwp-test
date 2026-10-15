@@ -3,8 +3,8 @@
 | 단계 | 내용 | 완료 기준 | 상태 |
 |---|---|---|---|
 | 0 | 양식 확보 (HWPX 저장본, 개인정보 제거) | 스타일·필드·표 구조 확인 | 대기 (실제 양식 없음, 합성 양식으로 대체 시험) |
-| 1 | 검증 PoC (`poc/`) | [verification-spike.md](06-quality/verification-spike.md)의 핵심 항목 판정 | **완료**(rhwp 내). 한컴 열림(S-23)은 미확인 |
-| 2 | 코어 MVP + rhwp 엔진 (`packages/core`) | 프로필 기반 md → 양식 HWPX, 하드코딩 제거 | 시작 전 (아래 작업 목록) |
+| 1 | 검증 PoC (태그 `poc-final`) | [verification-spike.md](06-quality/verification-spike.md)의 핵심 항목 판정 | **완료**(rhwp 내). 한컴 열림(S-23)은 미확인 |
+| 2 | 코어 MVP + rhwp 엔진 (`packages/core`) | 프로필 기반 md → 양식 HWPX, 하드코딩 제거 | **진행 중** — I-0(기반)·I-1(이식) 완료, 단계 계획은 [07-implementation/](07-implementation/) |
 | 3 | CLI + MCP + Mermaid | `convert`/`validate`/`analyze`, 에이전트 루프 | 대기 |
 | 4 | 웹 UI (React + MUI) | 프로필 선택 → 변환 → 미리보기 → 다운로드 | 후순위 |
 
@@ -13,6 +13,7 @@
 ```
 
 ## 2단계 준비 (작업 목록)
+세부 단계(I-0~I-8)와 진행 상태는 [07-implementation/](07-implementation/)가 기준이다. 아래는 초기 목록이며 1·2번은 I-0·I-1로 완료됐다.
 1. **저장소 구성**: pnpm workspace(`pnpm-workspace.yaml`, 락파일, `packageManager`), `.nvmrc` 24, `engines`, 빌드 스크립트 허용 목록, `@types/mdast` 등 암묵 의존성 명시, vitest에서 `web/e2e` 제외([ADR-0013](adr/0013-runtime-and-package-manager.md)).
 2. **PoC → `packages/core` 승격**: `core.ts`(변환), `engine/types.ts`·`engine/rhwp.ts`, `parse.ts`, `validate.ts`, `blocks.ts`, `verify.ts`. Node 전용(`convert.ts`, `mermaid.ts`, `engine/rhwp-node.ts`)은 `packages/cli`로([ADR-0011](adr/0011-core-adapter-split-by-injection.md)).
 3. **하드코딩 제거(프로필화)**: `FIELD_MAP`, 라벨 이름(`UC ID` 등), 유스케이스 전용 IR·스키마, 표 선택(첫 표), 흐름 번호 형식. 프로필 형식 v1을 먼저 정의한다([doctype-profile.md](04-conversion/doctype-profile.md)).

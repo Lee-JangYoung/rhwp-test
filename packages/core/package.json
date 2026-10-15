@@ -5,9 +5,32 @@
   "license": "MIT",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./node": "./src/node/index.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@rhwp/core": "catalog:",
+    "@types/mdast": "catalog:",
+    "ajv": "catalog:",
+    "remark-frontmatter": "catalog:",
+    "remark-gfm": "catalog:",
+    "remark-parse": "catalog:",
+    "unified": "catalog:",
+    "yaml": "catalog:"
+  },
+  "peerDependencies": {
+    "@mermaid-js/mermaid-cli": "catalog:"
+  },
+  "peerDependenciesMeta": {
+    "@mermaid-js/mermaid-cli": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@mermaid-js/mermaid-cli": "catalog:",
+    "tsx": "catalog:"
   }
 }

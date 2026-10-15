@@ -47,7 +47,7 @@ interface DocumentSession {
 | `export` | `exportHwpx` / `exportHwp`, 손실은 `*WithReport`, 검증은 `exportHwpVerify` |
 | `renderSvg` | `renderPageSvg` |
 
-## PoC에서 확정된 연산 (`poc/src/engine/types.ts`)
+## PoC에서 확정된 연산 (`packages/core/src/engine/types.ts`)
 위 제안(`appendParagraph` 등)은 아직 쓰지 않았고, 채움형 변환(ADR-0012)에 필요한 연산이 확정됐다.
 
 | 연산 | 용도 |

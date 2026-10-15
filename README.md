@@ -1,0 +1,34 @@
+# yangsik
+
+AI가 Markdown으로 쓴 SI 산출물(유스케이스·클래스·DB 명세서)을 **지정한 양식의 HWPX**로 변환한다. Markdown이 원본이고 산출물은 생성물이다. 엔진은 [rhwp](https://github.com/edwardkim/rhwp)(`@rhwp/core` 0.8.7).
+
+설계·결정·검증 상태는 [`_spec/`](_spec/README.md)에 있다. 구현은 단계별로 진행한다([`_spec/roadmap.md`](_spec/roadmap.md)).
+
+## 시작하기
+
+Node 24 LTS, pnpm 12.11.2(`packageManager` 필드)가 필요하다.
+
+```bash
+pnpm install
+pnpm check                       # typecheck + lint + format + test
+pnpm --filter @yangsik/cli start -- check
+pnpm --filter @yangsik/cli start -- convert \
+  --md templates/usecase/example.md --template templates/usecase/template.hwpx --out out/usecase.hwpx
+pnpm --filter @yangsik/web dev   # 웹 PoC (http://127.0.0.1:5173)
+pnpm --filter @yangsik/web test:e2e
+```
+
+- Mermaid 렌더는 시스템 Chromium이 필요하다(`PUPPETEER_EXECUTABLE_PATH`, 없으면 Mermaid 시험은 건너뜀). 브라우저는 내려받지 않는다.
+- 외부 양식 샘플은 저장소에 넣지 않는다(저작권 불명확). 로컬 경로로만 지정한다.
+
+## 구성
+
+| 경로 | 내용 |
+|---|---|
+| `packages/core` | `@yangsik/core` — 환경 독립 변환 코어. Node 전용은 `@yangsik/core/node` |
+| `packages/cli` | `@yangsik/cli` — 명령줄 |
+| `packages/web` | `@yangsik/web` — React 웹 PoC(`@rhwp/editor`), I-8에서 MUI로 재구성 |
+| `templates/usecase` | 첫 문서 유형 자료(스키마·합성 양식·예제 md) |
+
+## 라이선스
+MIT

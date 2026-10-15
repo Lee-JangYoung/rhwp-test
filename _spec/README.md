@@ -5,11 +5,11 @@
 ## 구성
 
 ```
-poc/             # (있음) 가능성 확인용 TypeScript PoC: CLI·웹(React)·시험. 제품 코드 아님. I-1 이식 후 삭제
-packages/core    # (뼈대만, I-0) @yangsik/core — 양식 분석, 프로필, md → IR → 엔진 인터페이스. Node/브라우저 공통
-packages/cli     # (뼈대만, I-0) @yangsik/cli
+packages/core    # @yangsik/core — 양식 분석, 변환, md → IR, 엔진 인터페이스. Node/브라우저 공통, Node 전용은 @yangsik/core/node
+packages/cli     # @yangsik/cli — 명령줄 (명령 재설계는 I-4)
+packages/web     # @yangsik/web — React 웹 PoC (I-8에서 MUI로 재구성)
 packages/mcp     # (계획) LLM 에이전트용 MCP 서버
-packages/web     # (계획) Vite + React + MUI 웹 UI (후순위)
+templates/usecase # 첫 문서 유형 자료(스키마·합성 양식·예제 md). I-2에서 프로필로 대체
 templates/<유형>/ # (계획) 문서 유형 프로필: 양식(HWPX) + template.md + schema.json + profile.yaml + prompt.md
 ```
 런타임 Node 24 LTS, pnpm 12 워크스페이스([ADR-0013](adr/0013-runtime-and-package-manager.md)).
@@ -26,7 +26,7 @@ templates/<유형>/ # (계획) 문서 유형 프로필: 양식(HWPX) + template.
 
 | 항목 | 상태 |
 |---|---|
-| 저장소 내용 | `_spec/`, `CLAUDE.md`, **`poc/`**(CLI·웹 PoC, 시험 통과). `packages/`는 아직 없음 |
+| 저장소 내용 | `_spec/`, `CLAUDE.md`, `packages/`(core·cli·web, I-1 이식 완료, 하드코딩은 아직 있음), `templates/usecase`. PoC 원본은 태그 `poc-final` |
 | 확인됨 (합성 양식, rhwp 내) | 누름틀 채움, 표 복제 + 복제본별 셀 채움, Mermaid 그림 삽입, 저장 후 자체 검증, 브라우저 동작, 에디터 임베드, 조판 보정(그림·표 높이·쪽 나눔) → [verification-spike.md](06-quality/verification-spike.md) |
 | 미검증 | **한컴 열림(S-23)**, 실제 SI 양식, 스타일 적용, 머리말·쪽번호 보존, 폭 계산·쪽수 정확도(S-11) |
 | 막힌 것 | 실제 양식 샘플(HWPX) 없음, 한컴 확인 환경 없음, 원격에 PR base 브랜치 없음 |
