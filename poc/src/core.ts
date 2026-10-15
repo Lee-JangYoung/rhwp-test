@@ -54,6 +54,17 @@ export interface ConvertReport {
   timingsMs: Record<string, number>;
 }
 
+/** 항목 하나가 양식 표에 채우는 "라벨 → 값" */
+export function blockValues(item: Ir['items'][number]): Record<string, string> {
+  return {
+    'UC ID': item.id,
+    유스케이스명: item.name,
+    ...item.fields,
+    '기본 흐름': numbered(item.flows.main),
+    ...(item.flows.alt.length ? { '대안 흐름': numbered(item.flows.alt) } : {}),
+  };
+}
+
 const numbered = (lines: string[]) => lines.map((s, i) => `${i + 1}. ${s}`).join('\n');
 
 export async function convertBytes(
@@ -109,13 +120,7 @@ export async function convertBytes(
     const expectedBlocks: Record<string, string>[] = [];
     ir.items.forEach((item, i) => {
       const map = labelCells(s, live[i]);
-      const values: Record<string, string> = {
-        'UC ID': item.id,
-        유스케이스명: item.name,
-        ...item.fields,
-        '기본 흐름': numbered(item.flows.main),
-        ...(item.flows.alt.length ? { '대안 흐름': numbered(item.flows.alt) } : {}),
-      };
+      const values = blockValues(item);
       const want: Record<string, string> = {};
       for (const [label, value] of Object.entries(values)) {
         const cell = map.get(label);
