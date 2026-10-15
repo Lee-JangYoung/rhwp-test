@@ -6,6 +6,7 @@ test('W1~W6: 로드·매핑·위반·변환·저장', async ({ page }) => {
   page.on('console', (m) => logs.push(`${m.type()}: ${m.text()}`));
   page.on('pageerror', (e) => logs.push(`pageerror: ${e.message}`));
   await page.goto('/');
+  await page.getByTestId('auto').uncheck(); // 기존 시나리오는 수동 변환 기준
   // W2: 양식 매핑 미리보기 (rhwp WASM이 브라우저에서 로드됨)
   await expect(page.getByTestId('mapping')).toContainText('양식 라벨: UC ID, 유스케이스명, 액터, 사전조건, 사후조건, 기본 흐름, 대안 흐름', { timeout: 60_000 });
   // W1: 호스팅 스튜디오 에디터에 양식 표시

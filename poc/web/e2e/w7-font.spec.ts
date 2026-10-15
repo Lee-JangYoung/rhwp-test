@@ -13,6 +13,7 @@ const diagramHash = async (page: import('@playwright/test').Page) => {
 
 test('W7: 글꼴 동적 추가', async ({ page }) => {
   await page.goto('/');
+  await page.getByTestId('auto').uncheck(); // 기존 시나리오는 수동 변환 기준
   await expect(page.getByTestId('mapping')).toBeVisible({ timeout: 60_000 });
   const before = await diagramHash(page);
   await page.getByTestId('font').setInputFiles(FONT);

@@ -19,6 +19,9 @@ export function App() {
   const [status, setStatus] = useState('양식 불러오는 중…');
   const [fonts, setFonts] = useState<string[]>([]);
   const [localFontDialog, setLocalFontDialog] = useState(false);
+  const [auto, setAuto] = useState(true);
+  const [templateName, setTemplateName] = useState('usecase-synthetic.hwpx (내장 합성 양식)');
+  const seq = useRef(0);
   const host = useRef<HTMLDivElement>(null);
   const editor = useRef<Promise<RhwpEditor> | null>(null);
 
@@ -54,22 +57,70 @@ export function App() {
     previewMapping(md, template).then(setMapping).catch((e) => setStatus(`매핑 실패: ${(e as Error).message}`));
   }, [md, template]);
 
-  const run = async () => {
+  /** full=true: Mermaid 렌더까지 포함한 최종 변환, false: 빠른 미리보기(그림 제외) */
+  const run = async (full: boolean) => {
     if (!template) return;
-    setStatus('변환 중…');
-    setViolations([]);
+    const my = ++seq.current;
+    setStatus(full ? '변환 중…' : '미리보기 갱신 중…');
     try {
-      const out = await convertBytes(engine, { mdName: 'input.md', mdText: md, template, schema, renderDiagram, preview: false });
+      const out = await convertBytes(engine, { mdName: 'input.md', mdText: md, template, schema, renderDiagram: full ? renderDiagram : undefined, preview: false });
+      if (my !== seq.current) return; // 더 최근 요청이 있으면 버린다
+      setViolations([]);
       setReport(out.report);
       setResult(out.bytes);
       setTab('result');
       await show(out.bytes, 'result.hwpx');
-      setStatus(`변환 완료 — 자체 검증 ${out.report.verify.ok ? '통과' : '실패'}`);
+      setStatus(`${full ? '변환 완료' : '미리보기 완료(Mermaid 그림 제외)'} — 자체 검증 ${out.report.verify.ok ? '통과' : '실패'}`);
     } catch (e) {
+      if (my !== seq.current) return;
       if (e instanceof ValidationError) {
         setViolations(e.violations.map((v) => `input.md:${v.line}  ${v.path}  ${v.message}`));
         setStatus(`규약 위반 ${e.violations.length}건`);
       } else setStatus(`변환 실패: ${(e as Error).message}`);
+    }
+  };
+
+  // md나 양식이 바뀌면 잠시 뒤 자동으로 빠른 미리보기를 돌린다
+  useEffect(() => {
+    if (!auto || !template) return;
+    const t = setTimeout(() => void run(false), 800);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [md, template, auto]);
+
+  const loadTemplate = async (file: File | undefined) => {
+    if (!file) return;
+    setTemplate(new Uint8Array(await file.arrayBuffer()));
+    setTemplateName(file.name);
+    setResult(null);
+    setReport(null);
+    setTab('template');
+  };
+
+  const loadMd = async (file: File | undefined) => {
+    if (file) setMd(await file.text());
+  };
+
+  const saveBlob = (bytes: Uint8Array, name: string) => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([bytes.slice().buffer], { type: 'application/hwp+zip' }));
+    a.download = name;
+    a.click();
+  };
+
+  /** 에디터에서 사람이 고친 내용까지 포함해 내보낸다(우리 변환 결과 저장과 다름) */
+  const exportFromEditor = async () => {
+    try {
+      const bytes = await (await (editor.current!)).exportHwpx();
+      const s = await engine.open(bytes);
+      try {
+        setStatus(`에디터 내보내기 완료 — ${bytes.length} bytes, 재로드 ${s.pageCount()}쪽, 표 ${s.topTables().length}개`);
+      } finally {
+        s.dispose();
+      }
+      saveBlob(bytes, 'edited.hwpx');
+    } catch (e) {
+      setStatus(`에디터 내보내기 실패: ${(e as Error).message}`);
     }
   };
 
@@ -87,22 +138,22 @@ export function App() {
     }
   };
 
-  const download = () => {
-    if (!result) return;
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([result.slice().buffer], { type: 'application/hwp+zip' }));
-    a.download = 'result.hwpx';
-    a.click();
-  };
+  const download = () => result && saveBlob(result, 'result.hwpx');
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '420px 1fr', height: '100vh', font: '13px sans-serif' }}>
       <div style={{ overflow: 'auto', padding: 8, borderRight: '1px solid #ccc' }}>
-        <h3 style={{ margin: '0 0 6px' }}>Markdown</h3>
+        <h3 style={{ margin: '0 0 6px' }}>양식 (HWPX)</h3>
+        <div data-testid="template-name">{templateName}</div>
+        <input data-testid="tplfile" type="file" accept=".hwpx" onChange={(e) => void loadTemplate(e.target.files?.[0])} />
+        <h3 style={{ margin: '8px 0 6px' }}>Markdown</h3>
+        <input data-testid="mdfile" type="file" accept=".md,.markdown,.txt" onChange={(e) => void loadMd(e.target.files?.[0])} />
         <textarea data-testid="md" value={md} onChange={(e) => setMd(e.target.value)} style={{ width: '100%', height: 220, fontFamily: 'monospace' }} />
         <div style={{ margin: '6px 0' }}>
-          <button data-testid="convert" onClick={run} disabled={!template}>변환</button>{' '}
-          <button data-testid="download" onClick={download} disabled={!result}>HWPX 저장</button>
+          <button data-testid="convert" onClick={() => void run(true)} disabled={!template}>변환(Mermaid 포함)</button>{' '}
+          <button data-testid="download" onClick={download} disabled={!result}>변환 결과 저장</button>{' '}
+          <button data-testid="export" onClick={() => void exportFromEditor()}>에디터 내용 내보내기</button>
+          <div><label><input data-testid="auto" type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} /> 자동 미리보기 (입력 후 0.8초, Mermaid 제외)</label></div>
         </div>
         <div style={{ margin: '6px 0' }}>
           글꼴(.ttf/.otf/.woff2): <input data-testid="font" type="file" accept=".ttf,.otf,.woff,.woff2" onChange={(e) => void addFont(e.target.files?.[0])} />
