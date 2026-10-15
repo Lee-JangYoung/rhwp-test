@@ -1,79 +1,40 @@
 # 아키텍처
 
-관련 결정: [ADR-0001](../adr/0001-monorepo-core-cli-web.md), [ADR-0003](../adr/0003-environment-agnostic-core.md), [ADR-0005](../adr/0005-pin-rhwp-and-isolate-adapter.md)
+결정: [ADR-0001](../adr/0001-monorepo-core-cli-web.md), [ADR-0003](../adr/0003-environment-agnostic-core.md), [ADR-0005](../adr/0005-pin-rhwp-and-isolate-adapter.md), [ADR-0006](../adr/0006-template-registration-and-doctype-profile.md), [ADR-0007](../adr/0007-llm-by-host-agent-conversion-llm-free.md), [ADR-0008](../adr/0008-core-with-cli-mcp-web-adapters.md), [ADR-0009](../adr/0009-engine-interface.md), [ADR-0010](../adr/0010-hwpx-first-output.md), [ADR-0011](../adr/0011-core-adapter-split-by-injection.md), [ADR-0012](../adr/0012-repeat-block-by-table-clone.md), [ADR-0013](../adr/0013-runtime-and-package-manager.md)
 
-## 패키지 구조 (모노레포)
+## 패키지
+
+| 패키지 | 책임 |
+|---|---|
+| `core` | 양식 분석, 프로필 로드·검증, md 파싱, IR, 렌더 계획, 변환, 검증. rhwp 호출은 엔진 인터페이스 뒤(`engines/rhwp`)에만([engine-interface.md](engine-interface.md)) |
+| `cli` | 인자 처리, 파일 I/O, Mermaid 렌더(`mermaid-cli`), 리포트 출력 |
+| `mcp` | LLM 에이전트용 도구 노출(stdio) |
+| `web` | 프로필 선택, 업로드/다운로드, SVG 미리보기 (후순위) |
+
+스택: TypeScript, Node 24 LTS, pnpm 12 workspace, Vitest, Playwright, remark/unified, yaml, Ajv, Vite, React(+MUI, 후순위). 버전은 정확히 고정([ADR-0013](../adr/0013-runtime-and-package-manager.md)).
+프로필 저장·관리와 다중 사용자(서버) 제공 방식은 **미결**이다.
+
+## 두 흐름
 
 ```
-packages/
-  core/     # Markdown → IR → 어댑터 호출. Node/브라우저 공통
-  cli/      # md2hwp (Node)
-  web/      # Vite 웹 UI
-templates/  # 양식 파일과 style-map.yaml
-examples/   # 샘플 md, 기대 결과
+[등록] 샘플 양식 → 분석(core) → 해석 초안(호스트 LLM) → 스키마 검증·조립(core) → 사람 승인 → 프로필
+[변환] md → ① parse → ② normalize(IR) → ③ preprocess(Mermaid→이미지) → ④ plan(프로필 적용)
+         → ⑤ execute(엔진: 양식 로드·필드·본문·스타일) → ⑥ export(HWPX) → ⑦ verify
 ```
 
-| 패키지 | 책임 | 의존 |
+- 등록·변환 모두 ①~④와 분석은 rhwp와 무관한 순수 함수(단위 테스트 용이), ⑤⑥과 양식 분석의 rhwp 조회만 엔진에 의존한다.
+- 변환 경로에는 LLM이 없다([ADR-0007](../adr/0007-llm-by-host-agent-conversion-llm-free.md)). 상세: [doctype-profile.md](../04-conversion/doctype-profile.md)
+
+## 환경 주입
+
+| 항목 | CLI/MCP(Node) | 웹 |
 |---|---|---|
-| `core` | 파싱, IR 생성, 스타일 매핑, 렌더 계획 수립, 검증 | `remark` 계열, `yaml`, rhwp 어댑터 |
-| `core/adapter` | `@rhwp/core` 호출 전부 | `@rhwp/core` |
-| `cli` | 인자 처리, 파일 I/O, Mermaid 렌더링, 리포트 출력 | `core` |
-| `web` | UI, 업로드/다운로드, 미리보기 | `core` |
+| WASM 로드 | `initSync({module: bytes})` | `init({module_or_path})` |
+| `measureTextWidth` | 폭 계산 경로 확인 필요 (S-11) | Canvas 2D `measureText` |
+| 에셋 읽기 | `fs` | `File`/`fetch` |
+| 다이어그램 | `mermaid-cli` | 브라우저 mermaid |
 
-## 데이터 흐름
+환경 차이는 세 곳(WASM 초기화, Mermaid 렌더, 파일 입출력)이며 `Env` 객체 대신 **엔진 팩토리와 렌더러 주입**으로 푼다([ADR-0011](../adr/0011-core-adapter-split-by-injection.md)): `createRhwpEngine(init)`, `convertBytes(engine, { mdText, template, schema, renderDiagram? })`. PoC로 Node와 브라우저 모두 확인(S-18).
 
-```
-input.md
-  │ ① parse        (remark, front-matter 분리)
-  ▼
-mdast + meta
-  │ ② normalize    (IR 생성: 요소 단순화, 에셋 수집)
-  ▼
-IR (ir-spec.md)
-  │ ③ preprocess   (Mermaid → 이미지, 이미지 크기 계산)   ← 환경별 주입
-  ▼
-IR + assets
-  │ ④ plan         (style-map 적용 → 렌더 명령 목록)
-  ▼
-RenderPlan
-  │ ⑤ execute      (rhwp 어댑터: 템플릿 로드 → 필드 → 본문 → 스타일)
-  ▼
-HwpDocument
-  │ ⑥ export       (HWP / HWPX)
-  ▼
-bytes + Report
-  │ ⑦ verify       (재로드, 쪽수/텍스트 비교, contentLoss)
-  ▼
-output.hwp|hwpx + report.json (+ preview.svg|pdf)
-```
-
-- ①~④는 rhwp를 쓰지 않는 **순수 함수**라 단위 테스트가 쉽다.
-- ⑤⑥만 rhwp 어댑터에 의존한다.
-- ③은 환경별로 달라 **주입**한다(CLI: `mermaid-cli`, 웹: 브라우저 렌더 또는 사전 변환).
-
-## 환경 주입 포인트
-
-| 주입 항목 | CLI(Node) | 웹(브라우저) |
-|---|---|---|
-| WASM 로더 | `initSync({module: fs.readFileSync(...)})` | `init({module_or_path: '/rhwp_bg.wasm'})` |
-| `measureTextWidth` | canvas 라이브러리 또는 글꼴 메트릭 기반 | Canvas 2D `measureText` |
-| 파일 접근 | `fs` | `File`/`fetch` |
-| 다이어그램 렌더러 | `mermaid-cli`(Chromium) | 브라우저 내 mermaid |
-
-```ts
-// core가 요구하는 환경 인터페이스 (제안)
-interface Env {
-  loadWasm(): Promise<void>;
-  measureTextWidth(font: string, text: string): number;
-  readAsset(ref: string): Promise<Uint8Array>;
-  renderDiagram?(kind: string, source: string): Promise<{ bytes: Uint8Array; ext: 'png' | 'svg' }>;
-}
-```
-
-## 오류 처리 원칙
-- 미지원 요소는 **실패하지 않고 경고로 보고**하며 대체 처리한다(`--strict`면 실패).
-- 스타일 이름이 양식에 없으면 기본 스타일로 대체하고 경고한다.
-- 저장 손실(`contentLoss`)이 있으면 리포트에 포함한다.
-
-## 기술 스택 (제안)
-TypeScript, pnpm workspace, Vitest, remark/unified, yaml, Vite(web).
+## 오류 원칙
+미지원 요소와 없는 스타일은 실패 대신 경고로 보고하고 대체 처리한다(`--strict`면 실패). 저장 손실은 리포트에 포함한다.

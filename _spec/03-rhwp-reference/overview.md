@@ -27,12 +27,16 @@
 
 - **브라우저**: `await init({ module_or_path: '/rhwp_bg.wasm' })`
 - **Node**: `initSync({ module: fs.readFileSync('rhwp_bg.wasm') })` — 0.8.7에서 동작 확인(스파이크).
-- **공통 필수 조건**: `globalThis.measureTextWidth(font, text)`를 init 전에 등록해야 한다. 글자 폭 측정을 호스트에 위임하기 때문이다.
+- **README 요구**: `globalThis.measureTextWidth(font, text)`를 init 전에 등록(글자 폭 측정을 호스트에 위임). 단 Node 시험에서는 호출되지 않아 실제 경로는 확인 필요(S-11).
 
 ## 확인된 동작 (Node 스파이크, 2026-10-14)
 
 | 시나리오 | 결과 |
 |---|---|
-| `createBlankDocument()` → `insertText` → `exportHwp()` → `new HwpDocument(bytes)` | 성공, 텍스트 보존 |
-| 빈 문서의 `getStyleList()` | 빈 배열 → 스타일이 있는 양식 파일이 필요 |
-| 근사 `measureTextWidth` 사용 | 동작은 하나 레이아웃 정확도는 별도 검증 필요 |
+| `HwpDocument.createEmpty()` → `insertText` → `exportHwp()` → `new HwpDocument(bytes)` | 성공, 텍스트 보존 (S-00) |
+| `createTable(0,0,0,3,2)` 후 `getControls()`, `getTableDimensions`, `getCellInfo` | 표 컨트롤, `{rowCount:3,colCount:2}`, 셀의 행·열·병합 정보 반환 (R-01 일부). 저장·재로드 후 표 위치 해석은 미확인 |
+| `createEmpty()` 문서의 `getStyleList()` | 빈 배열 → 스타일이 있는 양식 파일이 필요 |
+| HWP·HWPX 저장 → 재로드·재저장·교차 저장 (텍스트·표·누름틀) | 모두 동일, 손실 0건 (S-02 부분) |
+| 번들 템플릿 문서의 HWPX 글꼴 정보 | 글꼴 **이름만** 기록(함초롬돋움·함초롬바탕), 7개 언어 카테고리별 정의, 글꼴 파일은 포함되지 않음. 줄 배치(`lineseg`)가 파일에 저장됨 |
+| `renderPageSvg`의 글꼴 | `font-family`에 HWP 글꼴명을 앞세운 폴백 체인(예: 함초롬바탕 → Batang → 바탕 → Nanum Myeongjo → Noto Serif KR …) |
+| `measureTextWidth` | Node 시험에서 **호출되지 않음** — 폭 계산 경로 확인 필요 (S-11) |
