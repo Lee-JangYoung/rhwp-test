@@ -2,17 +2,17 @@
 
 **목적**: AI가 만든 SI 산출물 Markdown(유스케이스·클래스·DB 명세서)을 **등록한 양식의 HWPX**로 변환한다. **Markdown이 원본**이고 산출물은 생성물이다. 변환 엔진은 [rhwp](https://github.com/edwardkim/rhwp)(`@rhwp/core` 0.8.7, Rust + WASM). HWP 5.0·Excel 출력은 후순위.
 
-## 구성 (계획)
+## 구성
 
 ```
-packages/core    # 양식 분석, 프로필, md → IR → 엔진 인터페이스. Node/브라우저 공통
-packages/cli     # md2hwp
-packages/mcp     # LLM 에이전트용 MCP 서버
-packages/web     # Vite 웹 UI (후순위)
-templates/<유형>/ # 문서 유형 프로필: 양식(HWPX) + template.md + schema.json + profile.yaml + prompt.md
-examples/        # 샘플 md
-spike/           # rhwp 동작 검증 스크립트
+poc/             # (있음) 가능성 확인용 TypeScript PoC: CLI·웹(React)·시험. 제품 코드 아님
+packages/core    # (계획) 양식 분석, 프로필, md → IR → 엔진 인터페이스. Node/브라우저 공통
+packages/cli     # (계획) md2hwp
+packages/mcp     # (계획) LLM 에이전트용 MCP 서버
+packages/web     # (계획) Vite + React + MUI 웹 UI (후순위)
+templates/<유형>/ # (계획) 문서 유형 프로필: 양식(HWPX) + template.md + schema.json + profile.yaml + prompt.md
 ```
+런타임 Node 24 LTS, pnpm 12 워크스페이스([ADR-0013](adr/0013-runtime-and-package-manager.md)).
 
 ```
 [변환] AI가 template.md대로 md 작성 → 규약 검증 → 변환 → 검증 → HWPX
@@ -26,11 +26,11 @@ spike/           # rhwp 동작 검증 스크립트
 
 | 항목 | 상태 |
 |---|---|
-| 저장소 내용 | `_spec/`와 `CLAUDE.md`만 있음. **코드 없음**, 위 "구성"은 모두 계획 |
-| 확인됨 (단순 문서·번들 템플릿 기준) | HWP·HWPX 저장 → 재로드·재저장·교차 저장, 표 행 추가·삭제·복제, 문단·표 블록 반복 복제, 치환, 누름틀 왕복, Mermaid PNG → 그림 삽입 → 재로드 |
-| 미검증 | 실제 양식, 스타일 적용, 양식 요소(머리말·쪽번호) 보존, 한컴 열림, 쪽수 정확도 → [verification-spike.md](06-quality/verification-spike.md) |
-| 막힌 것 | 양식 샘플(HWPX) 없음, 원격에 PR base 브랜치 없음 |
-| 미결 | "한컴과 거의 동일"의 기준, MCP 우선순위, md 원본 정책, 서버 정책 → [roadmap.md](roadmap.md) |
+| 저장소 내용 | `_spec/`, `CLAUDE.md`, **`poc/`**(CLI·웹 PoC, 시험 통과). `packages/`는 아직 없음 |
+| 확인됨 (합성 양식, rhwp 내) | 누름틀 채움, 표 복제 + 복제본별 셀 채움, Mermaid 그림 삽입, 저장 후 자체 검증, 브라우저 동작, 에디터 임베드, 조판 보정(그림·표 높이·쪽 나눔) → [verification-spike.md](06-quality/verification-spike.md) |
+| 미검증 | **한컴 열림(S-23)**, 실제 SI 양식, 스타일 적용, 머리말·쪽번호 보존, 폭 계산·쪽수 정확도(S-11) |
+| 막힌 것 | 실제 양식 샘플(HWPX) 없음, 한컴 확인 환경 없음, 원격에 PR base 브랜치 없음 |
+| 미결 | "한컴과 거의 동일"의 기준, 프로필 형식 v1, MCP 우선순위, md 원본 정책, 서버 정책 → [roadmap.md](roadmap.md) |
 
 ## 문서 지도
 

@@ -4,7 +4,7 @@
 
 나중에 라이브러리를 바꿔도 코어가 흔들리지 않도록, 문서를 열고 편집·저장하는 부분을 **엔진 인터페이스**로 분리한다. 첫 구현체는 rhwp다. 코어는 이 인터페이스만 알고 `@rhwp/core`를 import하지 않는다(import는 `engines/rhwp`에서만).
 
-## 인터페이스 (제안, 최소)
+## 인터페이스 (제안, 최소) — PoC 구현은 아래 "PoC에서 확정된 연산" 참고
 
 ```ts
 interface DocumentEngine {
@@ -46,6 +46,20 @@ interface DocumentSession {
 | `replace` | `replaceAll` / `replaceOne`(본문만) |
 | `export` | `exportHwpx` / `exportHwp`, 손실은 `*WithReport`, 검증은 `exportHwpVerify` |
 | `renderSvg` | `renderPageSvg` |
+
+## PoC에서 확정된 연산 (`poc/src/engine/types.ts`)
+위 제안(`appendParagraph` 등)은 아직 쓰지 않았고, 채움형 변환(ADR-0012)에 필요한 연산이 확정됐다.
+
+| 연산 | 용도 |
+|---|---|
+| `topTables()`, `tableCells(t)`, `setCellText(t, idx, text)` | 표 찾기·셀 읽기·셀 채움(라벨 규칙은 코어의 `blocks`) |
+| `cloneTableAfter(src, after)` | 반복 블록 복제 |
+| `insertImageAfter(t, img)` | 그림 삽입(글자처럼 취급으로 고정) |
+| `setTablePageBreak(t, mode)`, `fitTableHeights()` | 쪽 나눔 설정, 표 높이 맞춤(L-14, L-15) |
+| `tableLayouts()`, `pictureLayouts()`, `controlCounts()`, `bodyText()`, `pageCount()` | 저장 후 자체 검증 |
+| `setField`, `getField`, `analyze`, `renderSvg`, `export`, `dispose` | 필드·분석·미리보기·저장 |
+
+엔진 생성은 환경 초기화를 주입받는다: `createRhwpEngine(init)`([ADR-0011](../adr/0011-core-adapter-split-by-injection.md)).
 
 ## 교체 방법
 1. 새 엔진을 `DocumentEngine`으로 구현한다.
