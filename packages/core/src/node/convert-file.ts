@@ -1,4 +1,5 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { type ConvertReport, convertBytes, type DiagramRenderer, ProfileError } from '../convert/convert';
 import type { DocumentEngine } from '../engine/types';
@@ -19,7 +20,7 @@ export interface ConvertOptions {
   previewDir?: string;
   /** 프로필의 output을 덮어쓴다 */
   output?: Partial<Omit<Profile['output'], 'diagram'>>;
-  /** Mermaid 중간 산출물 폴더 */
+  /** Mermaid 중간 산출물 폴더. 생략하면 이 호출만의 임시 폴더를 만들고 끝나면 지운다(동시 실행이 섞이지 않게) */
   workDir?: string;
 }
 
@@ -29,13 +30,27 @@ export async function convert(engine: DocumentEngine, o: ConvertOptions): Promis
   const loaded = loadProfileFile(o.profilePath);
   const errors = loaded.issues.filter((i) => i.severity === 'error');
   if (errors.length || !loaded.profile || !loaded.templatePath) throw new ProfileError(errors);
-  const work = o.workDir ?? join(dirname(o.outPath), 'work');
+  const ownWork = o.workDir === undefined;
+  const work = o.workDir ?? mkdtempSync(join(tmpdir(), 'yangsik-work-'));
   const renderDiagram: DiagramRenderer = async (source, name) => renderMermaid(source, work, name);
+  try {
+    return await convertFile(engine, o, loaded, renderDiagram);
+  } finally {
+    if (ownWork) rmSync(work, { recursive: true, force: true });
+  }
+}
+
+async function convertFile(
+  engine: DocumentEngine,
+  o: ConvertOptions,
+  loaded: ReturnType<typeof loadProfileFile>,
+  renderDiagram: DiagramRenderer,
+): Promise<NodeConvertReport> {
   const { bytes, report, previews } = await convertBytes(engine, {
     mdName: o.mdPath,
     mdText: readFileSync(o.mdPath, 'utf8'),
-    template: new Uint8Array(readFileSync(loaded.templatePath)),
-    profile: loaded.profile,
+    template: new Uint8Array(readFileSync(loaded.templatePath as string)),
+    profile: loaded.profile as Profile,
     dataSchema: loaded.schemaPath ? (JSON.parse(readFileSync(loaded.schemaPath, 'utf8')) as object) : undefined,
     renderDiagram,
     skipDiagrams: o.skipMermaid,

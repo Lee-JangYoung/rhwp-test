@@ -107,7 +107,11 @@ export function readMarkdown(profile: Pick<Profile, 'md'>, md: string): MdRead {
     if (!fm) break;
     out.lines.set(`/${esc(fm)}`, lineOf(node));
     try {
-      out.data[fm] = (YAML.parse((node as { value: string }).value) ?? {}) as Record<string, unknown>;
+      // 값은 문자열로 보존한다(1.10→1.1, 0123→123 같은 숫자 변환 방지). 규약(JSON Schema)은 문자열 기준이다.
+      out.data[fm] = (YAML.parse((node as { value: string }).value, { schema: 'failsafe' }) ?? {}) as Record<
+        string,
+        unknown
+      >;
     } catch (e) {
       out.warnings.push({ line: lineOf(node), message: `front-matter 해석 실패: ${(e as Error).message}` });
     }
@@ -176,6 +180,8 @@ export function readMarkdown(profile: Pick<Profile, 'md'>, md: string): MdRead {
       for (const slot of g.slots) {
         const at = ptr(base, slot.key);
         const missing = (what: string) => {
+          // 없는 슬롯은 "값 없음"으로 고정한다(바깥 범위의 같은 이름 값이 끼어들지 않게)
+          node[slot.key] = undefined;
           if (isOptional(slot)) return;
           const why = g.missingHeading ? `제목 '${key}'가 없음` : `${what}가 없음`;
           viol(g.line, at, `필수 항목 누락: ${slot.key} (${why})`);
@@ -196,8 +202,13 @@ export function readMarkdown(profile: Pick<Profile, 'md'>, md: string): MdRead {
                 viol(lineOf(row), at, '표 행에는 키(1열)와 값(2열)이 필요함');
                 continue;
               }
-              if (cells[0] in obj) viol(lineOf(row), ptr(at, cells[0]), `키가 중복됨: ${cells[0]}`);
-              obj[cells[0]] = cells[1];
+              if (Object.hasOwn(obj, cells[0])) viol(lineOf(row), ptr(at, cells[0]), `키가 중복됨: ${cells[0]}`);
+              Object.defineProperty(obj, cells[0], {
+                value: cells[1],
+                enumerable: true,
+                writable: true,
+                configurable: true,
+              });
               out.lines.set(ptr(at, cells[0]), lineOf(row));
             }
             node[slot.key] = obj;

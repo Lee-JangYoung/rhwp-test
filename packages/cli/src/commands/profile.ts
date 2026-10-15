@@ -14,6 +14,13 @@ import {
 import { loadProfileFile, renderMermaid, rhwpEngine } from '@yangsik/core/node';
 import { EXIT, formatIssues, type Out, readBytes, readText, UsageError } from '../util';
 
+/** 양의 정수 옵션(NaN·0·음수는 비용 상한을 끄거나 시도를 없애므로 거부) */
+function positiveInt(name: string, v: string | undefined): number | undefined {
+  if (v === undefined) return undefined;
+  if (!/^[1-9]\d*$/.test(v)) throw new UsageError(`${name}에는 1 이상의 정수가 필요함: ${v}`);
+  return Number(v);
+}
+
 export const profileOptions = {
   md: { type: 'string' },
   'no-mermaid': { type: 'boolean' },
@@ -35,6 +42,7 @@ export const profileOptions = {
   'allow-send': { type: 'boolean' },
   'print-prompt': { type: 'boolean' },
   'copy-inputs': { type: 'boolean' },
+  force: { type: 'boolean' },
 } as const;
 
 export interface ProfileValues {
@@ -56,6 +64,7 @@ export interface ProfileValues {
   'allow-send'?: boolean;
   'print-prompt'?: boolean;
   'copy-inputs'?: boolean;
+  force?: boolean;
 }
 
 const need = (cond: unknown, usage: string) => {
@@ -180,6 +189,21 @@ async function generate(v: ProfileValues, out: Out): Promise<number> {
     if (!prov) throw new UsageError(`알 수 없는 provider: ${v.provider} (${Object.keys(PROVIDERS).join(' | ')})`);
   }
   const capability = (v.capability ?? prov?.capability ?? 'A') as 'A' | 'B' | 'C';
+  const maxIterations = positiveInt('--max-iterations', v['max-iterations']);
+  const maxTotalTokens = positiveInt('--max-tokens', v['max-tokens']);
+  const dir = v.out ?? 'out/profile-draft';
+  const outputs = [
+    'profile.yaml',
+    'review.md',
+    'review.json',
+    ...(v['copy-inputs'] ? ['template.hwpx', 'example.md', ...(v.schema ? ['schema.json'] : [])] : []),
+  ];
+  // 승인·수정한 프로필을 모르고 덮어쓰지 않도록, 비용이 드는 호출 전에 확인한다
+  if (!v['print-prompt'] && !v.force) {
+    const exist = outputs.filter((f) => existsSync(join(dir, f)));
+    if (exist.length)
+      throw new UsageError(`${dir}에 이미 있는 파일: ${exist.join(', ')} (덮어쓰려면 --force, 아니면 다른 --out)`);
+  }
   if (!['A', 'B', 'C'].includes(capability)) throw new UsageError('--capability는 A | B | C');
   const author = await import('@yangsik/author').catch(() => {
     throw new UsageError('@yangsik/author를 불러올 수 없음 (pnpm install)');
@@ -221,11 +245,10 @@ async function generate(v: ProfileValues, out: Out): Promise<number> {
   const res = await author.generateProfile(input, {
     llm,
     allowSend: true,
-    maxIterations: v['max-iterations'] ? Number(v['max-iterations']) : undefined,
-    maxTotalTokens: v['max-tokens'] ? Number(v['max-tokens']) : undefined,
+    maxIterations,
+    maxTotalTokens,
   });
 
-  const dir = v.out ?? 'out/profile-draft';
   mkdirSync(dir, { recursive: true });
   if (res.yaml) writeFileSync(join(dir, 'profile.yaml'), res.yaml);
   writeFileSync(join(dir, 'review.md'), author.reviewToMarkdown(res.review, res.yaml));

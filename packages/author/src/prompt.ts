@@ -65,7 +65,7 @@ export function buildUserPrompt(i: UserPromptInput): string {
   const parts = [
     `문서 유형: ${i.typeName ?? '(미지정)'}`,
     ...(i.hint ? [`작성자 설명: ${i.hint}`] : []),
-    `## 양식 사실 (JSON)\n\`\`\`json\n${JSON.stringify(i.facts, null, 1)}\n\`\`\``,
+    `## 양식 사실 (JSON)\n\`\`\`json\n${JSON.stringify(i.facts, (k, v) => (k === 'texts' ? undefined : v), 1)}\n\`\`\``,
     `## 예제 md\n\`\`\`markdown\n${i.exampleMd}\n\`\`\``,
     ...(i.dataSchema ? [`## md 규약 (JSON Schema)\n\`\`\`json\n${JSON.stringify(i.dataSchema, null, 1)}\n\`\`\``] : []),
     `프로필의 template은 "template.hwpx"${i.dataSchema ? ', schema는 "schema.json"' : ''}로 씁니다(프로필 폴더에 그 이름으로 복사됩니다).`,

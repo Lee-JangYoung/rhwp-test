@@ -4,7 +4,7 @@ import { formatViolations, validateData, type Violation } from '../markdown/vali
 import { checkProfile } from '../profile/check';
 import { closest, type Issue } from '../profile/issues';
 import type { Binding, Format, Locator, Policy, Profile, ValueSpec } from '../profile/types';
-import { type LabelOptions, labelCells } from './blocks';
+import { duplicateLabels, type LabelOptions, labelCells } from './blocks';
 import { findTablesIn } from './resolve';
 import { formatValue, getPath, type Scopes, resolveValue } from './values';
 import { type Expected, type VerifyReport, verifyOutput } from './verify';
@@ -138,8 +138,8 @@ export async function convertBytes(
 
     // 표 위치는 번호(본문 표 순서)이므로 표를 만들거나 지울 때 밀린다. 객체로 추적해 한꺼번에 보정한다.
     const tracked: TRef[] = [];
-    const track = (index: number): TRef => {
-      const t: TRef = { index, removed: false };
+    const track = (index: number, orig?: number): TRef => {
+      const t: TRef = { index, removed: false, orig };
       tracked.push(t);
       return t;
     };
@@ -147,13 +147,18 @@ export async function convertBytes(
       for (const t of tracked) if (!t.removed && t.index > after) t.index += n;
     };
     const refOf = (t: TRef): TableRef => s.topTables()[t.index];
-    /** 문맥(바깥 repeat의 복제본) 안의 표들. 바깥이면 문서 전체 */
+    // 바깥(repeat 밖)의 표는 양식의 원래 표(번호 = 양식 기준)다. 같은 표는 항상 같은 객체라 삭제·채움 기록이 이어진다.
+    const baseImages = s.controlCounts().gso ?? 0;
+    const baseFloating = s.pictureLayouts().filter((l) => !l.treatAsChar).length;
+    const rootRefs: TRef[] = s.topTables().map((_, i) => track(i, i));
+    /** 문맥(바깥 repeat의 복제본) 안의 표들. 바깥이면 양식의 표들 */
     const contextTables = (unit: Unit | null): TRef[] =>
-      unit ? unit.tables.filter((t) => !t.removed) : s.topTables().map((_, i) => track(i));
+      unit ? unit.tables.filter((t) => !t.removed) : rootRefs.filter((t) => !t.removed);
     const find = (unit: Unit | null, loc: Locator, cand: TRef[] = contextTables(unit)): TRef[] => {
       return findTablesIn(
         s,
-        cand.map((t, k) => ({ ref: refOf(t), index: k, item: t })),
+        // index 위치 지정: 바깥은 양식의 표 번호, repeat 안은 그 복제본 안의 순번 (점검과 같은 의미)
+        cand.map((t, k) => ({ ref: refOf(t), index: unit ? k : (t.orig ?? k), item: t })),
         loc,
       ).map((x) => x.item);
     };
@@ -178,6 +183,7 @@ export async function convertBytes(
     const splitTables: TRef[] = [];
     const pending: { t: TRef; name: string; sources: string[] }[] = [];
     const expectedLists: { t: TRef; cells: { row: number; col: number; text: string }[] }[] = [];
+    const filled = new Map<TRef, Set<string>>();
     const expectedTokens: string[] = [];
     const expectedParagraphs: string[][] = [];
 
@@ -234,17 +240,18 @@ export async function convertBytes(
             const copies: TRef[][] = arr.map((_, k) =>
               k === 0 ? protos : protos.map((_, j) => track(first + k * m + j)),
             );
-            // 바깥 문맥이 복제본의 표도 자기 것으로 알도록 한다
-            if (unit && added) {
-              const at = unit.tables.indexOf(protos[m - 1]) + 1;
-              unit.tables.splice(at, 0, ...copies.slice(1).flat());
-            }
+            // 바깥 문맥(모든 조상)이 복제본의 표도 자기 것으로 알도록 한다
+            if (added)
+              for (let p = unit; p; p = p.parent) {
+                const at = p.tables.indexOf(protos[m - 1]);
+                if (at >= 0) p.tables.splice(at + 1, 0, ...copies.slice(1).flat());
+              }
             units += arr.length;
             cloned += arr.length - 1;
             // 뒤쪽 복제본부터 채운다: 안쪽 복제·삭제가 앞쪽 복제본의 위치를 바꾸지 않는다
             for (let k = arr.length - 1; k >= 0; k--) {
               const item = arr[k];
-              const u: Unit = { tables: copies[k] };
+              const u: Unit = { tables: copies[k], parent: unit };
               run(
                 (b.do ?? []) as Binding[],
                 [item, ...scopes],
@@ -269,6 +276,7 @@ export async function convertBytes(
               value: b.value as 'right' | 'below' | undefined,
             };
             const lc = labelCells(s, ref, lo);
+            const dups = duplicateLabels(s, ref, lo);
             const map = (b.map ?? {}) as Record<string, ValueSpec>;
             const entries: [string, string | undefined][] = [];
             for (const [label, spec] of Object.entries(map)) {
@@ -292,14 +300,24 @@ export async function convertBytes(
                 );
                 continue;
               }
+              if (dups.has(label)) {
+                add('label-ambiguous', 'error', `${path}.map.${label}`, `표에 같은 라벨이 여러 개: ${label}`, {
+                  actual: label,
+                });
+                continue;
+              }
               if (value === undefined) continue;
               s.setCellText(ref, cell.idx, value);
               want[label] = value;
               cellsSet++;
+              // 같은 표를 앞서 채운 바인딩의 기대값을 이 값으로 바꾼다
+              for (const e of expectedBlocks) if (e.t === target && label in e.values) e.values[label] = value;
+              filled.get(target)?.add(label) ?? filled.set(target, new Set([label]));
             }
             if ((b.unmappedValue ?? 'clear') === 'clear') {
               for (const [label, cell] of lc) {
-                if (!(label in want)) {
+                // 앞선 바인딩이 채운 라벨은 지우지 않는다
+                if (!(label in want) && !filled.get(target)?.has(label)) {
                   s.setCellText(ref, cell.idx, '');
                   want[label] = '';
                 }
@@ -320,9 +338,25 @@ export async function convertBytes(
             const columns = (b.columns ?? {}) as Record<string, ValueSpec>;
             const clearUnmapped = (b.unmappedValue ?? 'clear') === 'clear';
             const cells0 = s.tableCells(ref);
-            const headerOf = new Map(cells0.filter((c) => c.row === headerRows - 1).map((c) => [c.text.trim(), c.col]));
+            const headerCells = cells0.filter((c) => c.row === headerRows - 1);
+            const headerOf = new Map(headerCells.map((c) => [c.text.trim(), c.col]));
+            const dupHeaders = new Set(
+              headerCells.map((c) => c.text.trim()).filter((t, i, a) => t && a.indexOf(t) !== i),
+            );
             const colOf = new Map<number, ValueSpec>();
             for (const [header, spec] of Object.entries(columns)) {
+              if (dupHeaders.has(header.trim())) {
+                add(
+                  'label-ambiguous',
+                  'error',
+                  `${path}.columns.${header}`,
+                  `표 머리행에 같은 머리글이 여러 개: ${header}`,
+                  {
+                    actual: header,
+                  },
+                );
+                continue;
+              }
               const col = headerOf.get(header.trim());
               if (col === undefined)
                 add(
@@ -339,10 +373,10 @@ export async function convertBytes(
             if (recs.length) {
               const known = new Set([...Object.keys(recs[0]), '#']);
               for (const [header, spec] of Object.entries(columns)) {
-                const heads =
-                  typeof spec === 'string'
-                    ? [...spec.matchAll(/\{([^{}]+)\}/g)].map((x) => x[1].split('.')[0])
-                    : [spec.from.split('.')[0]];
+                const paths =
+                  typeof spec === 'string' ? [...spec.matchAll(/\{([^{}]+)\}/g)].map((x) => x[1]) : [spec.from];
+                // 머리글에 '.'가 있으면(No.) 경로 전체가 레코드의 키일 수 있다
+                const heads = paths.map((p) => (known.has(p) ? p : p.split('.')[0]));
                 for (const h of heads)
                   if (!known.has(h) && !scopes.some((sc) => Object.hasOwn(sc, h)))
                     add('path-unknown', 'error', `${path}.columns.${header}`, `레코드에 없는 키: ${h}`, {
@@ -378,7 +412,19 @@ export async function convertBytes(
                   const spec = colOf.get(col);
                   if (!spec && !clearUnmapped) continue;
                   const cell = cells.find((c) => c.row === r0 + n && c.col === col);
-                  if (!cell) continue;
+                  if (!cell) {
+                    if (spec)
+                      add(
+                        'merged-cell',
+                        'error',
+                        `${path}.columns`,
+                        `${r0 + n}행 ${col}열에 셀이 없음(견본 행에 병합 셀이 있어 행 복제로 채울 수 없음)`,
+                        {
+                          actual: { row: r0 + n, col },
+                        },
+                      );
+                    continue;
+                  }
                   const text = spec ? (resolveValue(spec, sc) ?? '') : '';
                   s.setCellText(ref, cell.idx, text);
                   exp.push({ row: r0 + n, col, text });
@@ -566,6 +612,8 @@ export async function convertBytes(
       tableCount,
       splitTables: [...new Set(splitTables.filter(alive).map((t) => t.index))].sort((a, z) => a - z),
       images: imagesInserted,
+      baseImages,
+      baseFloating,
       tableSplit: output.tablePageBreak,
       preExportCounts: preCounts,
     };
@@ -600,11 +648,14 @@ interface RenderedDiagramEntry extends RenderedDiagram {
 interface TRef {
   index: number;
   removed: boolean;
+  /** 양식의 원래 표 번호(바깥 문맥의 표만). 복제본은 없음 */
+  orig?: number;
 }
 
 /** repeat의 복제본 하나가 가진 표들 (바인딩의 문맥) */
 interface Unit {
   tables: TRef[];
+  parent: Unit | null;
 }
 
 /** in 없이 쓰는 cells·rows·remove는 문맥의 표가 하나일 때 그 표를 쓴다 */

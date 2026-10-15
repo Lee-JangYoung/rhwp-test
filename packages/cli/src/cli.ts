@@ -3,7 +3,7 @@ import { convertCmd, convertOptions } from './commands/convert';
 import { doctor } from './commands/doctor';
 import { profileCmd, profileOptions, type ProfileValues } from './commands/profile';
 import { validate, validateOptions } from './commands/validate';
-import { EXIT, Out, UsageError } from './util';
+import { EXIT, inputErrorMessage, Out } from './util';
 
 const HELP = `yangsik — Markdown → 양식 HWPX 변환
 
@@ -14,7 +14,7 @@ const HELP = `yangsik — Markdown → 양식 HWPX 변환
   yangsik profile test <profile> [--md 예제.md] [--no-mermaid] [--json]
   yangsik profile analyze <양식.hwpx>             양식 사실 JSON
   yangsik profile kinds [--all] | guide [주제] | schema
-  yangsik profile generate --template 양식.hwpx --example-md 예제.md --provider <anthropic|openai|ollama> --model <id> --allow-send [--out 폴더]
+  yangsik profile generate --template 양식.hwpx --example-md 예제.md --provider <anthropic|openai|ollama> --model <id> --allow-send [--out 폴더] [--force]
                            (--print-prompt: 전송 내용만 보여 주고 종료)
 
 종료 코드: 0 성공 · 1 입력/설정 오류 · 2 변환은 했으나 자체 검증 실패 · 3 예기치 못한 오류 · 4 --strict에서 경고
@@ -50,8 +50,9 @@ async function main(argv: string[]): Promise<number> {
         return EXIT.input;
     }
   } catch (e) {
-    if (e instanceof UsageError || (e as { code?: string }).code?.startsWith('ERR_PARSE_ARGS')) {
-      console.error((e as Error).message);
+    const msg = inputErrorMessage(e);
+    if (msg !== null) {
+      console.error(msg);
       return EXIT.input;
     }
     throw e;

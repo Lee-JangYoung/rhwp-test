@@ -48,6 +48,14 @@ export const ISSUE_CODES = {
     summary: '위치 지정에 맞는 표가 여러 개',
     fix: '더 구체적인 위치 지정(다른 label·headerLabel·index)을 쓴다.',
   },
+  'label-ambiguous': {
+    summary: '표 안에 같은 라벨·머리글이 여러 개',
+    fix: '양식에서 라벨·머리글을 서로 다른 텍스트로 만들거나, 해당 라벨을 매핑하지 않는다.',
+  },
+  'merged-cell': {
+    summary: '견본 행의 병합 셀 때문에 행 복제로 채울 수 없음',
+    fix: '견본 행에 세로 병합 셀이 없도록 양식을 고친다.',
+  },
   'token-not-found': {
     summary: '양식에 없는 치환 토큰({{이름}})',
     fix: '양식 분석의 tokens에 있는 이름만 쓴다.',

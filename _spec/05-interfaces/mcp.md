@@ -4,6 +4,7 @@
 
 - **LLM 호출은 호스트 에이전트가 한다.** 서버는 LLM API를 부르지 않는다(`@yangsik/mcp`에 LLM 라이브러리 의존 없음, 시험으로 확인).
 - 전송: stdio, 처리는 로컬. **파일 접근은 허용 폴더(`--root`, 반복 가능; 또는 `YANGSIK_ROOTS=경로1:경로2`; 기본은 현재 폴더)로 제한**한다. 읽기는 심볼릭 링크를 풀어 확인하고, 쓰기는 가장 가까운 기존 상위 폴더로 확인한다. 상대 경로는 첫 허용 폴더 기준.
+- 저장(`convert_md`의 `out_path`)은 **`.hwpx` 확장자만** 허용하고, 기존 파일이 심볼릭 링크면 대상도 허용 폴더 안이어야 한다. 프로필이 가리키는 양식·규약 경로도 같은 가드를 거친다. 인자는 `--root <폴더>` 또는 `--root=<폴더>`만 받고 값이 없거나 알 수 없는 인자는 오류로 종료한다(조용히 현재 폴더를 허용하지 않음). Mermaid 렌더는 네트워크가 막힌 격리 상태로 수행하고 작업 폴더는 호출마다 따로 만든다.
 - 실행: `node packages/mcp/bin/yangsik-mcp.mjs --root <폴더>` (TS 소스를 `tsx`로 실행). 클라이언트 설정 예(Claude Code `.mcp.json` 등):
   ```json
   { "mcpServers": { "yangsik": { "command": "node", "args": ["/절대경로/packages/mcp/bin/yangsik-mcp.mjs", "--root", "/절대경로/templates", "--root", "/절대경로/out"] } } }

@@ -149,3 +149,80 @@ describe('CLI', () => {
     expect(Object.keys(pkg.dependencies).filter((d) => /langchain|anthropic|openai|author/.test(d))).toEqual([]);
   });
 });
+
+describe('CLI 종료 코드·안전 (독립 검토 S-29 회귀)', () => {
+  it('없는 파일·열 수 없는 양식은 스택이 아니라 메시지와 종료 코드 1', () => {
+    expect(run(['convert', '/없는/파일.md', '-p', PROFILE]).code).toBe(1);
+    expect(run(['validate', '/없는/파일.md', '-p', PROFILE]).code).toBe(1);
+    expect(run(['convert', join(UC, 'example.md'), '-p', '/없는/profile.yaml']).code).toBe(1);
+    expect(run(['profile', 'check', '/없는/profile.yaml']).code).toBe(1);
+    const dir = tmp();
+    writeFileSync(join(dir, 'bad.hwpx'), 'not a hwpx');
+    const r = run(['profile', 'analyze', join(dir, 'bad.hwpx')]);
+    expect(r.code).toBe(1);
+    expect(r.stderr).not.toContain('at ');
+  });
+
+  it('여러 md 중 하나가 없어도 나머지는 변환하고 요약·보고서를 남긴다', () => {
+    const dir = tmp();
+    const r = run([
+      'convert',
+      join(UC, 'example.md'),
+      '/없는/x.md',
+      '-p',
+      PROFILE,
+      '-o',
+      dir,
+      '--no-mermaid',
+      '--report',
+      join(dir, 'rep.json'),
+      '--json',
+    ]);
+    expect(r.code).toBe(1);
+    expect(existsSync(join(dir, 'example.hwpx'))).toBe(true);
+    const summary = JSON.parse(r.stdout);
+    expect(summary.files.map((f: { code: number }) => f.code)).toEqual([0, 1]);
+    expect(JSON.parse(readFileSync(join(dir, 'rep.json'), 'utf8')).ok).toBe(false);
+  });
+
+  it('이름이 같은 md 여러 개는 변환 전에 거부한다 (조용히 덮어쓰지 않음)', () => {
+    const a = tmp();
+    const b = tmp();
+    writeFileSync(join(a, 'uc.md'), readFileSync(join(UC, 'example.md')));
+    writeFileSync(join(b, 'uc.md'), readFileSync(join(UC, 'example.md')));
+    const out = tmp();
+    const r = run(['convert', join(a, 'uc.md'), join(b, 'uc.md'), '-p', PROFILE, '-o', out, '--no-mermaid']);
+    expect(r.code).toBe(1);
+    expect(r.stderr).toContain('겹침');
+    expect(existsSync(join(out, 'uc.hwpx'))).toBe(false);
+  });
+
+  it('profile generate: 숫자 옵션 검증, 기존 산출물 보호(--force)는 비용이 드는 호출 전에 확인한다', () => {
+    const base = [
+      'profile',
+      'generate',
+      '--template',
+      join(UC, 'template.hwpx'),
+      '--example-md',
+      join(UC, 'example.md'),
+      '--provider',
+      'ollama',
+      '--model',
+      'x',
+      '--allow-send',
+    ];
+    for (const bad of [['--max-tokens', 'abc'], ['--max-iterations', '0'], ['--max-tokens=-5']]) {
+      const r = run([...base, ...bad]);
+      expect(r.code, bad.join(' ')).toBe(1);
+      expect(r.stderr).toContain('정수');
+    }
+    const dir = tmp();
+    writeFileSync(join(dir, 'profile.yaml'), 'APPROVED PROFILE v1');
+    const r = run([...base, '--out', dir]);
+    expect(r.code).toBe(1);
+    expect(r.stderr).toContain('이미 있는 파일');
+    expect(readFileSync(join(dir, 'profile.yaml'), 'utf8')).toBe('APPROVED PROFILE v1');
+    // --force를 주면 이 검사는 통과하고 다음 단계(제공자 패키지 확인)로 간다
+    expect(run([...base, '--out', dir, '--force']).stderr).toContain('@langchain/ollama');
+  });
+});

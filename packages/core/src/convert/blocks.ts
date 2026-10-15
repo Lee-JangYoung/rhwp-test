@@ -31,6 +31,21 @@ export function labelCells(session: DocumentSession, t: TableRef, o: LabelOption
   return out;
 }
 
+/** 같은 텍스트의 라벨이 둘 이상인 라벨(어느 행을 채울지 정할 수 없어 매핑하면 오류) */
+export function duplicateLabels(session: DocumentSession, t: TableRef, o: LabelOptions = {}): Set<string> {
+  const labelCol = o.labelColumn ?? 0;
+  const seen = new Set<string>();
+  const dup = new Set<string>();
+  for (const c of session.tableCells(t)) {
+    if (c.col !== labelCol) continue;
+    const label = c.text.trim();
+    if (!label) continue;
+    if (seen.has(label)) dup.add(label);
+    seen.add(label);
+  }
+  return dup;
+}
+
 /** 표 한 개의 "라벨 → 값 텍스트" */
 export function readBlock(session: DocumentSession, t: TableRef, o: LabelOptions = {}): Record<string, string> {
   const out: Record<string, string> = {};

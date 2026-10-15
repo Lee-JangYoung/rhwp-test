@@ -130,10 +130,7 @@ export async function checkProfile(
       if (t.label !== undefined) return x.labels.includes(t.label.trim());
       if (t.headerLabel !== undefined) return x.header.includes(t.headerLabel.trim());
       if (t.index !== undefined) return pos === t.index;
-      if (t.text !== undefined)
-        return (
-          x.sample.some((c) => c.text.includes(t.text as string)) || x.labels.some((l) => l.includes(t.text as string))
-        );
+      if (t.text !== undefined) return x.texts.some((c) => c.includes(t.text as string));
       return false;
     });
   };
@@ -303,6 +300,8 @@ export async function checkProfile(
                 here('slot-type-mismatch', 'error', at, "'*'는 kv 슬롯(키-값 표)을 가리켜야 함", { actual: spec });
               continue;
             }
+            if (tbl && labels.filter((l) => l === label.trim()).length > 1)
+              here('label-ambiguous', 'error', at, `표에 같은 라벨이 여러 개: ${label}`, { actual: label });
             if (tbl && !labels.includes(label.trim()))
               here('label-not-found', sev(profile.policy.onMissingLabel), at, `표에 없는 라벨: ${label}`, {
                 actual: label,
@@ -372,7 +371,17 @@ export async function checkProfile(
           if (tbl && headerRows > 4)
             here('kind-not-supported', 'error', `${path}.headerRows`, '머리행은 4개까지만 지원한다');
           if (tbl && header) {
-            for (const key of Object.keys(columns))
+            for (const key of Object.keys(columns)) {
+              if (header.filter((h) => h === key.trim()).length > 1)
+                here(
+                  'label-ambiguous',
+                  'error',
+                  `${path}.columns.${key}`,
+                  `표 머리행에 같은 머리글이 여러 개: ${key}`,
+                  {
+                    actual: key,
+                  },
+                );
               if (!header.includes(key.trim()))
                 here(
                   'label-not-found',
@@ -384,6 +393,7 @@ export async function checkProfile(
                     candidates: closest(key, header),
                   },
                 );
+            }
             if ((b.unmappedValue ?? 'clear') === 'clear') {
               const miss = header.filter((h) => h && !(h in columns));
               if (miss.length)

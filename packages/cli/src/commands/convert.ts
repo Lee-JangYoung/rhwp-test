@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, join } from 'node:path';
 import { type ConvertReport, ProfileError, ValidationError } from '@yangsik/core';
 import { convert, rhwpEngine } from '@yangsik/core/node';
-import { EXIT, formatIssues, type Out, UsageError, worst } from '../util';
+import { EXIT, formatIssues, inputErrorMessage, type Out, UsageError, worst } from '../util';
 
 export const convertOptions = {
   profile: { type: 'string', short: 'p' },
@@ -31,6 +31,15 @@ export async function convertCmd(files: string[], v: V, out: Out): Promise<numbe
   if (!files.length || !v.profile)
     throw new UsageError('사용: yangsik convert <md...> -p <profile.yaml> [-o 출력(.hwpx 또는 폴더)]');
   const results: { file: string; code: number; report?: ConvertReport & { out: string }; error?: unknown }[] = [];
+  // 같은 이름의 md가 여러 개면 출력이 서로 덮어쓰므로 시작 전에 막는다
+  const outs = new Map<string, string>();
+  for (const file of files) {
+    const o = outPathFor(file, files, v.out);
+    const prev = outs.get(o);
+    if (prev)
+      throw new UsageError(`출력 파일이 겹침: ${prev}, ${file} → ${o} (이름이 다른 md로 바꾸거나 따로 변환하세요)`);
+    outs.set(o, file);
+  }
   for (const file of files) {
     const outPath = outPathFor(file, files, v.out);
     try {
@@ -62,7 +71,13 @@ export async function convertCmd(files: string[], v: V, out: Out): Promise<numbe
       } else if (e instanceof ProfileError) {
         out.err(`✘ ${file}\n${formatIssues(v.profile, e.issues)}`);
         results.push({ file, code: EXIT.input, error: { issues: e.issues } });
-      } else throw e;
+      } else {
+        const msg = inputErrorMessage(e);
+        if (msg === null) throw e;
+        // 입력 문제는 그 파일만 실패로 기록하고 나머지를 계속 변환한다 (요약·보고서는 항상 남긴다)
+        out.err(`✘ ${file}\n${msg}`);
+        results.push({ file, code: EXIT.input, error: { message: msg } });
+      }
     }
   }
   const summary = { ok: results.every((r) => r.code === EXIT.ok), files: results };

@@ -173,11 +173,14 @@ export function buildReview(i: ReviewInput): ReviewReport {
     },
     rationale: (i.rationale ?? []).map((x) => ({
       ...x,
-      unverifiedEvidence: (x.evidence ?? []).filter((e) => !haystack.includes(e)),
+      unverifiedEvidence: (x.evidence ?? []).filter((e) => e.trim().length < 2 || !haystack.includes(e)),
     })),
     remainingIssues: i.issues,
   };
 }
+
+/** 표 셀에 넣을 글: 줄바꿈·파이프를 없애 표가 깨지지 않게 한다 */
+const cell = (v: string) => v.replace(/\r?\n/g, ' ⏎ ').replace(/\|/g, '\\|');
 
 /** 사람이 읽는 검토 보고서 (Markdown) */
 export function reviewToMarkdown(r: ReviewReport, yaml?: string): string {
@@ -231,7 +234,7 @@ export function reviewToMarkdown(r: ReviewReport, yaml?: string): string {
     );
     for (const x of r.rationale)
       L.push(
-        `| ${x.path} | ${x.why.replace(/\|/g, '\\|')} | ${x.confidence ?? '-'} | ${x.unverifiedEvidence.length ? x.unverifiedEvidence.join('; ') : '-'} |`,
+        `| ${cell(x.path)} | ${cell(x.why)} | ${x.confidence ?? '-'} | ${x.unverifiedEvidence.length ? cell(x.unverifiedEvidence.join('; ')) : '-'} |`,
       );
     L.push('');
   }

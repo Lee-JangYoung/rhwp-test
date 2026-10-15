@@ -5,6 +5,7 @@ import {
   type DiagramRenderer,
   type DocumentEngine,
   getProfileGuide,
+  GUIDE_TOPICS,
   type GuideTopic,
   type Issue,
   type Profile,
@@ -55,7 +56,7 @@ export interface Attempt {
   usage: Usage;
 }
 
-export type StopReason = 'passed' | 'max-iterations' | 'token-limit' | 'no-draft' | 'not-allowed';
+export type StopReason = 'passed' | 'max-iterations' | 'token-limit' | 'no-draft' | 'not-allowed' | 'llm-error';
 
 export interface GenerateResult {
   ok: boolean;
@@ -66,6 +67,8 @@ export interface GenerateResult {
   attempts: Attempt[];
   usage: Usage;
   review: ReviewReport;
+  /** stopReason이 llm-error일 때 모델 호출의 오류 메시지 */
+  error?: string;
 }
 
 export interface PromptPreview {
@@ -80,6 +83,48 @@ export interface PromptPreview {
   /** 전송에 포함되는 것 / 포함되지 않는 것 */
   contains: string[];
   excludes: string[];
+}
+
+/** 사용량이 없거나 이상하면(0·NaN) 글자 수로 어림해 비용 상한이 꺼지지 않게 한다 */
+function usageOf(res: LlmResponse, req: LlmRequest): Usage {
+  const ok = (n: number) => Number.isFinite(n) && n >= 0;
+  const { inputTokens: i, outputTokens: o } = res.usage ?? { inputTokens: Number.NaN, outputTokens: Number.NaN };
+  if (ok(i) && ok(o) && i + o > 0) return { inputTokens: i, outputTokens: o };
+  const inChars = req.system.length + req.messages.reduce((n, m) => n + m.content.length, 0);
+  const outChars = res.text.length + JSON.stringify(res.structured ?? '').length;
+  return { inputTokens: Math.ceil(inChars / 3), outputTokens: Math.ceil(outChars / 3) };
+}
+
+/** 프로필 폴더에 복사될 파일 이름과 맞는지: LLM이 임의 경로(/etc/passwd 등)를 쓰지 못하게 한다 */
+function fileNameIssues(profile: Profile, hasSchema: boolean): Issue[] {
+  const out: Issue[] = [];
+  if (profile.template !== 'template.hwpx')
+    out.push({
+      code: 'invalid-value',
+      severity: 'error',
+      path: 'template',
+      message: "template은 'template.hwpx'여야 함(프로필 폴더에 그 이름으로 복사됨)",
+      actual: profile.template,
+      candidates: ['template.hwpx'],
+    });
+  if (hasSchema && profile.schema !== 'schema.json')
+    out.push({
+      code: 'invalid-value',
+      severity: 'error',
+      path: 'schema',
+      message: "schema는 'schema.json'이어야 함",
+      actual: profile.schema,
+      candidates: ['schema.json'],
+    });
+  if (!hasSchema && profile.schema !== undefined)
+    out.push({
+      code: 'invalid-value',
+      severity: 'error',
+      path: 'schema',
+      message: '규약(schema)이 주어지지 않았으므로 schema 키를 쓰지 않는다',
+      actual: profile.schema,
+    });
+  return out;
 }
 
 const sum = (a: Usage, b: Usage): Usage => ({
@@ -117,12 +162,35 @@ function previewFrom(input: GenerateInput, facts: TemplateFacts, capability: Llm
     chars,
     contains: [
       '작성 가이드',
-      '양식 사실(표·라벨·머리글·누름틀 이름)',
+      '양식 사실: 표별 0열 라벨·첫 4행 텍스트·앞 12칸 샘플, 누름틀 이름, 토큰, 본문 문단 앞 60개(각 80자까지)',
       '예제 md 전문',
       ...(input.dataSchema ? ['md 규약(JSON Schema)'] : []),
     ],
-    excludes: ['HWPX 파일 바이너리', '양식 본문 전체', 'API 키·환경변수'],
+    excludes: [
+      'HWPX 파일 바이너리',
+      '위에 적은 범위 밖의 양식 내용(표 셀 전체, 본문 60문단 이후, 80자 뒤)',
+      'API 키·환경변수',
+    ],
   };
+}
+
+/** 모델이 낸 근거를 검증한다: 모양이 맞지 않는 항목은 버린다(보고서가 깨지지 않게) */
+function cleanRationale(v: unknown): Rationale[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const out: Rationale[] = [];
+  for (const x of v) {
+    if (!x || typeof x !== 'object') continue;
+    const r = x as Record<string, unknown>;
+    if (typeof r.path !== 'string' || typeof r.why !== 'string') continue;
+    out.push({
+      path: r.path,
+      why: r.why,
+      confidence:
+        r.confidence === 'high' || r.confidence === 'medium' || r.confidence === 'low' ? r.confidence : undefined,
+      evidence: Array.isArray(r.evidence) ? r.evidence.filter((e): e is string => typeof e === 'string') : undefined,
+    });
+  }
+  return out;
 }
 
 /** 모델 응답에서 { profile(YAML 텍스트), rationale }를 꺼낸다 */
@@ -136,7 +204,7 @@ export function extractDraft(res: Pick<LlmResponse, 'text' | 'structured'>): {
     const obj = o as Record<string, unknown>;
     const profile = 'profile' in obj ? obj.profile : 'bindings' in obj ? obj : undefined;
     if (profile === undefined) return { error: '응답에 profile이 없음' };
-    const rationale = Array.isArray(obj.rationale) ? (obj.rationale as Rationale[]) : undefined;
+    const rationale = cleanRationale(obj.rationale);
     return { yaml: typeof profile === 'string' ? profile : YAML.stringify(profile), rationale };
   };
   if (res.structured !== undefined && res.structured !== null) return fromObject(res.structured);
@@ -163,8 +231,12 @@ async function runTool(call: ToolCall, input: GenerateInput, facts: TemplateFact
         return JSON.stringify(facts);
       case 'describe_kinds':
         return JSON.stringify(describeKinds());
-      case 'get_guide':
-        return getProfileGuide(call.args.topic as GuideTopic | undefined).markdown;
+      case 'get_guide': {
+        const topic = call.args.topic;
+        if (topic !== undefined && !(GUIDE_TOPICS as readonly unknown[]).includes(topic))
+          return JSON.stringify({ error: `주제는 ${GUIDE_TOPICS.join(' | ')} 중 하나` });
+        return getProfileGuide(topic as GuideTopic | undefined).markdown;
+      }
       case 'check_profile': {
         const p = parseProfile(yamlOf());
         if (!p.profile) return JSON.stringify({ ok: false, issues: p.issues });
@@ -214,6 +286,7 @@ export async function generateProfile(input: GenerateInput, opts: GenerateOption
     | { yaml: string; profile?: Profile; rationale?: Rationale[]; test?: ProfileTestResult; issues: Issue[] }
     | undefined;
   let stop: StopReason = 'max-iterations';
+  let lastError: string | undefined;
 
   const finish = (): GenerateResult => {
     const review = buildReview({
@@ -240,10 +313,11 @@ export async function generateProfile(input: GenerateInput, opts: GenerateOption
       attempts,
       usage: total,
       review,
+      error: lastError,
     };
   };
 
-  if (!opts.allowSend) {
+  if (opts.allowSend !== true) {
     stop = 'not-allowed';
     return finish();
   }
@@ -265,26 +339,56 @@ export async function generateProfile(input: GenerateInput, opts: GenerateOption
   const responseSchema = llm.capability === 'C' ? undefined : { name: 'profile_draft', schema: buildResponseSchema() };
   const tools = llm.capability === 'A' ? TOOLS : undefined;
 
+  const budgetLeft = (used: Usage) =>
+    total.inputTokens + total.outputTokens + used.inputTokens + used.outputTokens < maxTokens;
+  const MAX_PARALLEL_TOOLS = 8;
+
   for (let n = 1; n <= maxIter; n++) {
-    if (total.inputTokens + total.outputTokens >= maxTokens) {
+    if (!budgetLeft({ inputTokens: 0, outputTokens: 0 })) {
       stop = 'token-limit';
       break;
     }
     let usage: Usage = { inputTokens: 0, outputTokens: 0 };
     let toolCalls = 0;
     let res: LlmResponse | undefined;
+    let llmError: string | undefined;
+    let outOfBudget = false;
+    // 도구를 쓰는 라운드는 최대 maxTools번(마지막 최종 답 호출 포함 LLM 호출은 최대 maxTools+1번)
     for (let round = 0; round <= maxTools; round++) {
+      if (!budgetLeft(usage)) {
+        outOfBudget = true;
+        res = undefined;
+        break;
+      }
       const req: LlmRequest = { system, messages, tools, responseSchema };
-      res = await llm.complete(req);
-      usage = sum(usage, res.usage);
+      try {
+        res = await llm.complete(req);
+      } catch (e) {
+        llmError = e instanceof Error ? e.message : String(e);
+        res = undefined;
+        break;
+      }
+      usage = sum(usage, usageOf(res, req));
       if (!res.toolCalls.length || !tools) break;
-      toolCalls += res.toolCalls.length;
-      messages.push({ role: 'assistant', content: res.text, toolCalls: res.toolCalls });
-      for (const c of res.toolCalls)
+      const calls = res.toolCalls.slice(0, MAX_PARALLEL_TOOLS);
+      toolCalls += calls.length;
+      messages.push({ role: 'assistant', content: res.text, toolCalls: calls });
+      for (const c of calls)
         messages.push({ role: 'tool', toolCallId: c.id, name: c.name, content: await runTool(c, input, facts) });
       if (round === maxTools) res = undefined; // 도구만 부르다 끝남
     }
     total = sum(total, usage);
+    if (llmError !== undefined) {
+      attempts.push({ n, draftError: `모델 호출 실패: ${llmError}`, issues: [], toolCalls, usage });
+      stop = 'llm-error';
+      lastError = llmError;
+      break;
+    }
+    if (outOfBudget) {
+      attempts.push({ n, draftError: '토큰 상한에 도달', issues: [], toolCalls, usage });
+      stop = 'token-limit';
+      break;
+    }
 
     const draft = res ? extractDraft(res) : { error: '도구 호출 횟수 상한까지 최종 답이 없음' };
     if (!draft.yaml) {
@@ -298,23 +402,37 @@ export async function generateProfile(input: GenerateInput, opts: GenerateOption
       continue;
     }
 
-    const parsed = parseProfile(draft.yaml);
-    const issues: Issue[] = [...parsed.issues];
+    // 모델이 낸 YAML은 신뢰할 수 없는 입력이다: 해석·점검 중 예외도 한 번의 실패 시도로 다룬다
+    let parsed: ReturnType<typeof parseProfile>;
+    const issues: Issue[] = [];
     let test: ProfileTestResult | undefined;
-    if (parsed.profile) {
-      const chk = await checkProfile(input.engine, parsed.profile, input.template, {
-        lineOf: parsed.lineOf,
-        dataSchema: input.dataSchema,
-      });
-      issues.push(...chk.issues);
-      if (chk.ok)
-        test = await testProfile(input.engine, {
-          profile: parsed.profile,
-          template: input.template,
-          exampleMd: input.exampleMd,
+    try {
+      parsed = parseProfile(draft.yaml);
+      issues.push(...parsed.issues);
+      if (parsed.profile) {
+        issues.push(...fileNameIssues(parsed.profile, !!input.dataSchema));
+        const chk = await checkProfile(input.engine, parsed.profile, input.template, {
+          lineOf: parsed.lineOf,
           dataSchema: input.dataSchema,
-          renderDiagram: input.renderDiagram,
         });
+        issues.push(...chk.issues);
+        if (chk.ok && !issues.some((i) => i.severity === 'error'))
+          test = await testProfile(input.engine, {
+            profile: parsed.profile,
+            template: input.template,
+            exampleMd: input.exampleMd,
+            dataSchema: input.dataSchema,
+            renderDiagram: input.renderDiagram,
+          });
+      }
+    } catch (e) {
+      parsed = { issues: [] };
+      issues.push({
+        code: 'yaml-syntax',
+        severity: 'error',
+        path: '',
+        message: `프로필을 해석할 수 없음: ${(e as Error).message.split('\n')[0]}`,
+      });
     }
     const failedChecks = test?.report?.verify.checks.filter((c) => !c.ok).map((c) => c.name) ?? [];
     const errors = issues.filter((i) => i.severity === 'error');

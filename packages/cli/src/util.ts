@@ -39,3 +39,14 @@ export function formatIssues(file: string, issues: Issue[]): string {
 }
 
 export class UsageError extends Error {}
+
+/** 입력 문제(없는 파일·읽을 수 없는 파일·rhwp가 문자열로 던진 열기 실패)인지: 종료 코드 1로 다룬다 */
+export function inputErrorMessage(e: unknown): string | null {
+  if (e instanceof UsageError) return e.message;
+  const code = (e as { code?: string } | null)?.code;
+  if (typeof code === 'string' && ['ENOENT', 'EACCES', 'EISDIR', 'ENOTDIR'].includes(code))
+    return `파일을 읽을 수 없음: ${(e as Error).message}`;
+  if (code?.startsWith('ERR_PARSE_ARGS')) return (e as Error).message;
+  if (typeof e === 'string') return `입력을 처리할 수 없음: ${e}`;
+  return null;
+}

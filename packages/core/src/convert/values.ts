@@ -5,6 +5,9 @@ export type Scopes = Record<string, unknown>[];
 
 /** 점 표기 경로를 해석한다. 첫 토막은 가까운 범위부터 찾는다. 없으면 undefined. */
 export function getPath(scopes: Scopes, path: string): unknown {
+  // 키 이름에 '.'가 들어 있는 경우(md 표 머리글 'No.')는 경로 전체가 하나의 키다
+  const whole = scopes.find((s) => Object.hasOwn(s, path));
+  if (whole) return whole[path];
   const [head, ...rest] = path.split('.');
   const scope = scopes.find((s) => Object.hasOwn(s, head));
   if (!scope) return undefined;

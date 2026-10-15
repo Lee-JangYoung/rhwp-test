@@ -17,6 +17,8 @@ export interface TemplateFacts {
     header: string[];
     /** 앞쪽 4개 행의 셀 텍스트(열 순서). rows의 머리행 확인용 */
     rowsText: string[][];
+    /** 모든 셀의 텍스트(앞 500칸, 각 120자). table.text 위치 지정 확인용이라 LLM 프롬프트에는 넣지 않는다 */
+    texts: string[];
     /** 앞쪽 셀 몇 개의 내용(행·열 위치와 함께) */
     sample: { row: number; col: number; text: string }[];
   }[];
@@ -28,6 +30,8 @@ export interface TemplateFacts {
 }
 
 const clip = (s: string, n = 60) => (s.length > n ? `${s.slice(0, n)}…` : s);
+/** 라벨·머리글은 프로필에 그대로 쓰므로 거의 자르지 않는다 */
+const LABEL_MAX = 300;
 
 /**
  * 양식에서 프로필 작성에 필요한 사실을 JSON으로 뽑는다(LLM·사람의 입력).
@@ -46,13 +50,14 @@ export async function analyzeTemplate(engine: DocumentEngine, template: Uint8Arr
         rows: t.rows,
         cols: t.cols,
         mergedCells: t.mergedCells,
-        labels: cells.filter((c) => c.col === 0 && c.text.trim()).map((c) => clip(c.text.trim())),
-        header: cells.filter((c) => c.row === 0).map((c) => clip(c.text.trim())),
+        labels: cells.filter((c) => c.col === 0 && c.text.trim()).map((c) => clip(c.text.trim(), LABEL_MAX)),
+        header: cells.filter((c) => c.row === 0).map((c) => clip(c.text.trim(), LABEL_MAX)),
+        texts: cells.slice(0, 500).map((c) => clip(c.text.trim(), 120)),
         rowsText: [0, 1, 2, 3].map((r) =>
           cells
             .filter((c) => c.row === r)
             .sort((a, z) => a.col - z.col)
-            .map((c) => clip(c.text.trim())),
+            .map((c) => clip(c.text.trim(), LABEL_MAX)),
         ),
         sample: cells.slice(0, 12).map((c) => ({ row: c.row, col: c.col, text: clip(c.text.trim()) })),
       };

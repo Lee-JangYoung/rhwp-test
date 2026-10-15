@@ -209,6 +209,8 @@ bindings:
 | `field-not-found` | 양식에 없는 누름틀 이름 | 양식 분석(`analyzeTemplate`)의 fields에 있는 이름만 쓴다. |
 | `table-not-found` | 양식에서 위치 지정에 맞는 표가 없음 | 양식 분석의 표 목록(labels, header)을 보고 위치 지정을 고친다. |
 | `table-ambiguous` | 위치 지정에 맞는 표가 여러 개 | 더 구체적인 위치 지정(다른 label·headerLabel·index)을 쓴다. |
+| `label-ambiguous` | 표 안에 같은 라벨·머리글이 여러 개 | 양식에서 라벨·머리글을 서로 다른 텍스트로 만들거나, 해당 라벨을 매핑하지 않는다. |
+| `merged-cell` | 견본 행의 병합 셀 때문에 행 복제로 채울 수 없음 | 견본 행에 세로 병합 셀이 없도록 양식을 고친다. |
 | `token-not-found` | 양식에 없는 치환 토큰({{이름}}) | 양식 분석의 tokens에 있는 이름만 쓴다. |
 | `paragraph-not-found` | 양식에 없는 문단 | 양식 분석의 paragraphs에 있는 문단 텍스트(표식)를 그대로 쓴다. |
 | `yaml-ambiguous-key` | YAML이 문자열이 아닌 값(null·true·숫자)으로 읽는 키 | 양식 라벨이 NULL·Yes·No·숫자처럼 보이면 따옴표로 감싼다(예: 'NULL': '{NULL}'). |

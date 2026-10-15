@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
@@ -42,18 +43,49 @@ function resolveMmdc(): string {
   }
 }
 
+/** md의 값(항목 이름)이 파일 이름이 되므로 경로 문자를 없애고 해시를 붙인다 */
+export function safeFileName(name: string): string {
+  const base =
+    name
+      .replace(/[^\p{L}\p{N}._-]+/gu, '_')
+      .replace(/^[._]+/, '')
+      .slice(0, 60) || 'diagram';
+  return `${base}-${createHash('sha1').update(name).digest('hex').slice(0, 8)}`;
+}
+
+/**
+ * Mermaid → PNG. md의 내용을 Chromium에서 렌더하므로 두 겹으로 막는다:
+ * (1) mermaid `securityLevel: strict`(HTML·링크 제거), (2) 브라우저가 어떤 네트워크 요청도 하지 못하게 프록시를 막힌 곳으로 지정(루프백 포함).
+ * outDir은 이 호출만의 폴더여야 한다(같은 폴더를 동시에 쓰면 파일이 섞인다).
+ */
 export async function renderMermaid(source: string, outDir: string, name: string): Promise<RenderedDiagram> {
   const chromium = findChromium();
   if (!chromium) throw new Error('Chromium을 찾을 수 없습니다 (PUPPETEER_EXECUTABLE_PATH 설정 필요)');
   mkdirSync(outDir, { recursive: true });
-  const mmd = join(outDir, `${name}.mmd`);
-  const png = join(outDir, `${name}.png`);
+  const file = safeFileName(name);
+  const mmd = join(outDir, `${file}.mmd`);
+  const png = join(outDir, `${file}.png`);
   const cfg = join(outDir, 'puppeteer.json');
+  const mcfg = join(outDir, 'mermaid.json');
   writeFileSync(mmd, source);
-  writeFileSync(cfg, JSON.stringify({ executablePath: chromium, args: ['--no-sandbox', '--disable-setuid-sandbox'] }));
+  writeFileSync(
+    cfg,
+    JSON.stringify({
+      executablePath: chromium,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--proxy-server=socks5://127.0.0.1:9',
+        '--proxy-bypass-list=<-loopback>',
+      ],
+    }),
+  );
+  writeFileSync(mcfg, JSON.stringify({ securityLevel: 'strict' }));
   const mmdc = resolveMmdc();
   const t0 = Date.now();
-  await run(process.execPath, [mmdc, '-p', cfg, '-i', mmd, '-o', png, '-b', 'white', '-s', '2'], { timeout: 120_000 });
+  await run(process.execPath, [mmdc, '-p', cfg, '-c', mcfg, '-i', mmd, '-o', png, '-b', 'white', '-s', '2'], {
+    timeout: 120_000,
+  });
   const bytes = new Uint8Array(readFileSync(png));
   const { w, h } = pngSize(bytes);
   return { pngPath: png, bytes, widthPx: w, heightPx: h, ms: Date.now() - t0 };

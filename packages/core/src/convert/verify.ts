@@ -24,8 +24,11 @@ export interface Expected {
   tableCount: number;
   /** 쪽 나눔 설정을 기대하는 표(본문 표 순서) */
   splitTables: number[];
-  /** 본문에 들어간 그림 수 */
+  /** 이번 변환이 본문에 넣은 그림 수 */
   images: number;
+  /** 양식에 원래 있던 그림 컨트롤 수(gso)와 떠 있는 그림 수 */
+  baseImages: number;
+  baseFloating: number;
   /** 반복 블록 표에 기대하는 쪽 나눔 설정 */
   tableSplit: PageBreakMode;
   /** 저장 직전 세션의 컨트롤 종류별 개수 (재로드 결과와 비교) */
@@ -140,8 +143,8 @@ export async function verifyOutput(engine: DocumentEngine, bytes: Uint8Array, ex
     // 3) 그림 수
     checks.push({
       name: '그림 컨트롤 수',
-      ok: (counts.gso ?? 0) === exp.images,
-      detail: `기대 ${exp.images} / 실제 ${counts.gso ?? 0}`,
+      ok: (counts.gso ?? 0) === exp.baseImages + exp.images,
+      detail: `기대 ${exp.baseImages + exp.images} (양식 ${exp.baseImages} + 삽입 ${exp.images}) / 실제 ${counts.gso ?? 0}`,
     });
 
     // 2-1) 표 쪽 나눔: 나누지 않음이면 쪽을 넘는 표가 다음 쪽으로 이어지지 않고 잘린다
@@ -166,8 +169,8 @@ export async function verifyOutput(engine: DocumentEngine, bytes: Uint8Array, ex
     const floating = layouts.filter((l) => !l.treatAsChar).length;
     checks.push({
       name: '그림이 글자처럼 취급(문단 안 배치)',
-      ok: floating === 0,
-      detail: floating ? `떠 있는 그림 ${floating}개` : undefined,
+      ok: floating <= exp.baseFloating,
+      detail: floating > exp.baseFloating ? `새로 떠 있는 그림 ${floating - exp.baseFloating}개` : undefined,
     });
 
     // 4) 저장 전후 컨트롤 종류별 개수 (손실 보고가 놓친 사례가 있어 직접 비교)

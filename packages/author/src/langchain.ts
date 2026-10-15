@@ -2,7 +2,12 @@ import { AIMessage, type BaseMessage, HumanMessage, SystemMessage, ToolMessage }
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { Capability, ChatMessage, LlmClient, LlmRequest, LlmResponse } from './llm';
 
+/** @langchain/core가 "true"로 보고 추적(LangSmith 전송)을 자동으로 켜는 환경변수 */
+const TRACING_ENV = ['LANGSMITH_TRACING', 'LANGSMITH_TRACING_V2', 'LANGCHAIN_TRACING', 'LANGCHAIN_TRACING_V2'];
+
 export interface LangChainOptions {
+  /** 추적 환경변수가 켜져 있어도 쓴다(프롬프트가 외부 서비스로 간다). 기본 false */
+  allowTracing?: boolean;
   /** 생성 기록에 남기는 식별 (예: anthropic/claude-opus-5-5) */
   id: string;
   /** 모델이 지원하는 등급. 지정해야 한다 (자동 판정은 실제 모델 스파이크 후) */
@@ -38,6 +43,11 @@ function usageOf(m: AIMessage) {
  * 실제 모델별 동작(도구 호출·구조화 출력 방식)은 모델마다 달라 스파이크로 확인한다.
  */
 export function langChainClient(model: BaseChatModel, o: LangChainOptions): LlmClient {
+  const tracing = TRACING_ENV.filter((k) => process.env[k] === 'true');
+  if (tracing.length && !o.allowTracing)
+    throw new Error(
+      `추적 환경변수(${tracing.join(', ')})가 켜져 있어 프롬프트(양식 사실·예제 md)가 LangSmith로 전송될 수 있음. 환경변수를 끄거나 allowTracing: true로 명시 허용하세요.`,
+    );
   return {
     id: o.id,
     capability: o.capability,

@@ -1,9 +1,11 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join, relative } from 'node:path';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, relative } from 'node:path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
   analyzeTemplate,
   buildProfileSchema,
+  convertBytes,
   checkProfile,
   describeKinds,
   formatViolations,
@@ -19,7 +21,7 @@ import {
   validateData,
   ValidationError,
 } from '@yangsik/core';
-import { convert, loadProfileFile, renderMermaid, rhwpEngine, findChromium } from '@yangsik/core/node';
+import { findChromium, loadProfileFile, renderMermaid, rhwpEngine } from '@yangsik/core/node';
 import { z } from 'zod';
 import { PathGuard } from './paths';
 
@@ -85,7 +87,7 @@ export function createServer(opts: ServerOptions): McpServer {
       try {
         return await f(a);
       } catch (e) {
-        return fail((e as Error).message);
+        return fail(e instanceof Error ? e.message : String(e));
       }
     };
 
@@ -220,7 +222,13 @@ export function createServer(opts: ServerOptions): McpServer {
           const full = join(dir, e.name);
           if (e.isDirectory()) walk(full, depth + 1);
           else if (e.name === 'profile.yaml') {
-            const l = loadProfileFile(full);
+            let file: string;
+            try {
+              file = guard.read(full); // 허용 폴더 밖을 가리키는 링크·끊어진 링크는 건너뛴다
+            } catch {
+              continue;
+            }
+            const l = loadProfileFile(file);
             found.push({
               type: l.profile?.type,
               name: l.profile?.name,
@@ -248,11 +256,18 @@ export function createServer(opts: ServerOptions): McpServer {
       const p = loadProfile(guard, profile_path);
       if (!p.loaded.profile) return text({ ok: false, issues: p.loaded.issues });
       const ex = join(p.loaded.dir, 'example.md');
+      const example = (() => {
+        try {
+          return readFileSync(guard.read(ex), 'utf8');
+        } catch {
+          return null;
+        }
+      })();
       return text({
         type: p.loaded.profile.type,
         rules: mdRules(p.loaded.profile),
         schema: p.schema,
-        example: existsSync(ex) ? readFileSync(ex, 'utf8') : null,
+        example,
       });
     }),
   );
@@ -296,27 +311,29 @@ export function createServer(opts: ServerOptions): McpServer {
       },
     },
     safe(async ({ profile_path, md_path, md_text, out_path, skip_diagrams }) => {
-      const profileFile = guard.read(profile_path);
-      const out = guard.write(out_path);
-      let mdFile = md_path ? guard.read(md_path) : undefined;
-      if (md_text !== undefined) {
-        const tmp = join(dirname(out), `.${basename(out)}.input.md`);
-        mkdirSync(dirname(tmp), { recursive: true });
-        writeFileSync(tmp, md_text);
-        mdFile = tmp;
-      }
-      if (!mdFile) throw new Error('md_path 또는 md_text가 필요함');
+      // 프로필·양식·규약·md는 모두 PathGuard를 거쳐 읽고, 저장 위치도 확인한 뒤에만 쓴다.
+      const out = guard.write(out_path, ['.hwpx']);
+      const p = loadProfile(guard, profile_path);
+      if (p.errors.length || !p.loaded.profile) return text({ ok: false, issues: p.loaded.issues });
+      if (!p.template) return text({ ok: false, issues: p.loaded.issues });
+      const m = mdInput(guard, { md_path, md_text });
+      const diagrams = !(skip_diagrams || findChromium() === null);
+      const work = diagrams ? mkdtempSync(join(tmpdir(), 'yangsik-mcp-')) : undefined;
       try {
-        const r = await convert(rhwpEngine, {
-          mdPath: mdFile,
-          profilePath: profileFile,
-          outPath: out,
-          skipMermaid: skip_diagrams || findChromium() === null,
-          workDir: join(dirname(out), '.work'),
+        const { bytes, report: r } = await convertBytes(rhwpEngine, {
+          profile: p.loaded.profile,
+          mdText: m.text,
+          mdName: m.name,
+          template: p.template,
+          dataSchema: p.schema,
+          renderDiagram: work ? async (src, name) => renderMermaid(src, work, name) : undefined,
+          skipDiagrams: !diagrams,
         });
+        mkdirSync(dirname(out), { recursive: true });
+        writeFileSync(out, bytes);
         return text({
           ok: r.verify.ok,
-          out: relative(guard.roots[0], r.out),
+          out: relative(guard.roots[0], out),
           pages: r.pages,
           items: r.items,
           cellsSet: r.cellsSet,
@@ -324,16 +341,14 @@ export function createServer(opts: ServerOptions): McpServer {
           failedChecks: r.verify.checks.filter((c) => !c.ok),
           warnings: r.warnings,
           issues: r.issues,
-          mermaid: !(skip_diagrams || findChromium() === null),
+          mermaid: diagrams,
         });
       } catch (e) {
         if (e instanceof ValidationError) return text({ ok: false, violations: e.violations, formatted: e.message });
         if (e instanceof ProfileError) return text({ ok: false, issues: e.issues });
         throw e;
       } finally {
-        if (md_text !== undefined && mdFile) {
-          rmSync(mdFile, { force: true });
-        }
+        if (work) rmSync(work, { recursive: true, force: true });
       }
     }),
   );
