@@ -48,6 +48,14 @@ export const ISSUE_CODES = {
     summary: '위치 지정에 맞는 표가 여러 개',
     fix: '더 구체적인 위치 지정(다른 label·headerLabel·index)을 쓴다.',
   },
+  'slot-ambiguous': {
+    summary: '같은 영역의 같은 종류 슬롯이 여러 개인데 일부가 선택(optional)',
+    fix: '슬롯마다 under(하위 제목)로 영역을 나누거나, 모두 필수로 한다. 선택 슬롯이 없으면 뒤 슬롯이 앞 슬롯의 표·목록으로 잘못 읽힌다.',
+  },
+  'target-removed': {
+    summary: '앞선 remove가 지울 수 있는 표·라벨을 뒤에서 씀',
+    fix: '그 표·라벨을 쓰는 바인딩(cells·rows 등)을 remove보다 앞에 둔다.',
+  },
   'label-ambiguous': {
     summary: '표 안에 같은 라벨·머리글이 여러 개',
     fix: '양식에서 라벨·머리글을 서로 다른 텍스트로 만들거나, 해당 라벨을 매핑하지 않는다.',

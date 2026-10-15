@@ -28,6 +28,8 @@ type MdNode = RootContent;
 function text(node: unknown): string {
   const n = node as { type: string; value?: string; children?: unknown[] };
   if (n.type === 'break') return '\n';
+  // 표 셀 안의 <br>은 줄바꿈이다(LLM이 표 셀에서 줄을 나눌 때 흔히 쓴다)
+  if (n.type === 'html' && typeof n.value === 'string' && /^<br\s*\/?>$/i.test(n.value.trim())) return '\n';
   if (typeof n.value === 'string') return n.value;
   return (n.children ?? []).map(text).join('');
 }
@@ -169,6 +171,7 @@ export function readMarkdown(profile: Pick<Profile, 'md'>, md: string): MdRead {
       }
       g.slots.push(slot);
     }
+    const consumedCodes = new Set<Code>();
     for (const [key, g] of groups) {
       const tables = g.nodes.filter((n): n is Table => n.type === 'table');
       const lists = g.nodes.filter((n): n is List => n.type === 'list');
@@ -202,6 +205,8 @@ export function readMarkdown(profile: Pick<Profile, 'md'>, md: string): MdRead {
                 viol(lineOf(row), at, '표 행에는 키(1열)와 값(2열)이 필요함');
                 continue;
               }
+              if (cells.length > 2)
+                viol(lineOf(row), at, `표 행은 키·값 두 열만 쓸 수 있음(${cells.length}열: 3열 이후는 읽지 않음)`);
               if (Object.hasOwn(obj, cells[0])) viol(lineOf(row), ptr(at, cells[0]), `키가 중복됨: ${cells[0]}`);
               Object.defineProperty(obj, cells[0], {
                 value: cells[1],
@@ -239,7 +244,11 @@ export function readMarkdown(profile: Pick<Profile, 'md'>, md: string): MdRead {
             if (item.children.some((c) => c.type === 'list'))
               viol(lineOf(item), ptr(at, i), '중첩 목록은 지원하지 않음');
             out.lines.set(ptr(at, i), lineOf(item));
-            return text(item).trim();
+            return item.children
+              .filter((c) => c.type !== 'list')
+              .map((c) => text(c).trim())
+              .join('\n')
+              .trim();
           });
         } else if (slot.as === 'text') {
           if (textTaken || paras.length === 0) {
@@ -256,6 +265,7 @@ export function readMarkdown(profile: Pick<Profile, 'md'>, md: string): MdRead {
             continue;
           }
           out.lines.set(at, lineOf(mine[0]));
+          for (const c of mine) consumedCodes.add(c);
           node[slot.key] = mine.map((c, i) => {
             out.lines.set(ptr(at, i), lineOf(c));
             return c.value;
@@ -267,17 +277,31 @@ export function readMarkdown(profile: Pick<Profile, 'md'>, md: string): MdRead {
       const lostTables = tables.slice(ti);
       for (const t of lostTables) viol(lineOf(t), base, '슬롯에 연결되지 않은 표');
       for (const l of lists.slice(li)) viol(lineOf(l), base, '슬롯에 연결되지 않은 목록');
+      // 문단은 text 슬롯이 없으면 읽지 않는다: 조용히 버리지 않고 경고한다
+      if (!g.slots.some((x) => x.as === 'text'))
+        for (const p of paras) out.warnings.push({ line: lineOf(p), message: '슬롯에 연결되지 않은 문단은 읽지 않음' });
     }
+    // 코드 블록도 읽는 슬롯이 없으면 위반(조용한 손실 금지)
+    for (const c of everywhere.filter((n): n is Code => n.type === 'code'))
+      if (!consumedCodes.has(c)) viol(lineOf(c), base, `${c.lang ? `'${c.lang}' ` : ''}코드 블록을 읽는 슬롯이 없음`);
     // 하위 컬렉션
     const childLevels = new Set<number>();
     for (const [cn, cd] of Object.entries(def.children ?? {})) {
       childLevels.add(cd.heading.level);
       readCollection(cn, cd, childNodes, ptr(base, cn), node);
     }
-    // 어디에도 쓰이지 않은 제목은 경고
+    // 어디에도 쓰이지 않은 제목은 위반: 그 아래 내용이 조용히 사라지기 때문이다(제목 수준·철자 오류)
+    const known = [
+      ...claimed,
+      ...Object.values(def.children ?? {}).map((c) => `'${c.heading.pattern}'(${'#'.repeat(c.heading.level)})`),
+    ];
     for (const s of sections) {
       if (!used.has(s) && !childLevels.has(s.depth))
-        out.warnings.push({ line: lineOf(s.heading), message: `알 수 없는 제목 무시: ${s.title}` });
+        viol(
+          lineOf(s.heading),
+          base,
+          `알 수 없는 제목: '${s.title}' (이 항목에서 읽는 제목: ${known.join(', ') || '없음'}. 제목 수준·철자를 확인하세요)`,
+        );
     }
   };
 

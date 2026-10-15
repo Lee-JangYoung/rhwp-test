@@ -5,7 +5,6 @@ import { checkProfile } from '../profile/check';
 import { closest, type Issue } from '../profile/issues';
 import type { Binding, Format, Locator, Policy, Profile, ValueSpec } from '../profile/types';
 import { duplicateLabels, type LabelOptions, labelCells } from './blocks';
-import { findTablesIn } from './resolve';
 import { formatValue, getPath, type Scopes, resolveValue } from './values';
 import { type Expected, type VerifyReport, verifyOutput } from './verify';
 
@@ -99,6 +98,7 @@ export async function convertBytes(
   // 1) 프로필 점검: 프로필이 양식과 맞지 않으면 변환하지 않는다
   let t0 = Date.now();
   const check = await checkProfile(engine, profile, o.template, { dataSchema: o.dataSchema });
+  const plan = check.plan;
   const checkErrors = check.issues.filter((i) => i.severity === 'error');
   if (checkErrors.length) throw new ProfileError(checkErrors);
   for (const i of check.issues) warnings.push(`프로필 ${i.path}: ${i.message}`);
@@ -151,32 +151,14 @@ export async function convertBytes(
     const baseImages = s.controlCounts().gso ?? 0;
     const baseFloating = s.pictureLayouts().filter((l) => !l.treatAsChar).length;
     const rootRefs: TRef[] = s.topTables().map((_, i) => track(i, i));
-    /** 문맥(바깥 repeat의 복제본) 안의 표들. 바깥이면 양식의 표들 */
-    const contextTables = (unit: Unit | null): TRef[] =>
-      unit ? unit.tables.filter((t) => !t.removed) : rootRefs.filter((t) => !t.removed);
-    const find = (unit: Unit | null, loc: Locator, cand: TRef[] = contextTables(unit)): TRef[] => {
-      return findTablesIn(
-        s,
-        // index 위치 지정: 바깥은 양식의 표 번호, repeat 안은 그 복제본 안의 순번 (점검과 같은 의미)
-        cand.map((t, k) => ({ ref: refOf(t), index: unit ? k : (t.orig ?? k), item: t })),
-        loc,
-      ).map((x) => x.item);
-    };
-    const one = (unit: Unit | null, loc: Locator, at: string, cand?: TRef[]): TRef => {
-      const f = find(unit, loc, cand);
-      if (f.length !== 1) throw new Error(`${at}: 표를 하나로 정할 수 없음 (${f.length}개)`);
-      return f[0];
-    };
-    /** repeat 단위: table 하나 또는 range(시작 표~끝 표의 모든 표) */
-    const unitTables = (unit: Unit | null, loc: Locator, at: string): TRef[] => {
-      if (loc.range) {
-        const cand = contextTables(unit);
-        const a = cand.indexOf(one(unit, loc.range.start, `${at}.range.start`, cand));
-        const z = cand.indexOf(one(unit, loc.range.end, `${at}.range.end`, cand));
-        if (a > z) throw new Error(`${at}.range: 시작 표가 끝 표보다 뒤에 있음`);
-        return cand.slice(a, z + 1);
-      }
-      return [one(unit, loc, at)];
+    /**
+     * 점검(checkProfile)이 풀어낸 표: 문맥(복제본)의 pos번째, 바깥이면 양식의 pos번째 표.
+     * 실행은 위치 지정을 다시 해석하지 않는다(점검과 실행이 다른 표를 가리키는 일을 없앤다).
+     */
+    const slot = (unit: Unit | null, pos: number | undefined, at: string): TRef => {
+      const t = (unit ? unit.slots : rootRefs)[pos ?? -1];
+      if (!t) throw new Error(`${at}: 점검이 풀어낸 표 위치가 없음 (실행 계획 불일치)`);
+      return t;
     };
 
     const expectedBlocks: { t: TRef; values: Record<string, string>; labels: LabelOptions }[] = [];
@@ -194,7 +176,18 @@ export async function convertBytes(
           case 'fields': {
             for (const [data, name] of Object.entries((b.map ?? {}) as Record<string, string>)) {
               const v = getPath(scopes, data);
-              const value = v === undefined || v === null ? '' : String(v);
+              if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
+                add(
+                  'invalid-value',
+                  'error',
+                  `${path}.map.${data}`,
+                  `누름틀에는 문자열·목록만 넣을 수 있음(객체): ${data}`,
+                  { actual: data },
+                );
+                continue;
+              }
+              const value =
+                v === undefined || v === null ? '' : Array.isArray(v) ? v.map(String).join(', ') : String(v);
               fieldsSet[name] = s.setField(name, value);
               if (fieldsSet[name]) expectedFields[name] = value;
               else
@@ -210,7 +203,9 @@ export async function convertBytes(
           }
           case 'repeat': {
             const arr = (getPath(scopes, String(b.over)) ?? []) as Record<string, unknown>[];
-            const protos = unitTables(unit, b.unit as Locator, `${path}.unit`);
+            const range = plan.units.get(path);
+            if (!range) throw new Error(`${path}.unit: 점검이 풀어낸 단위가 없음 (실행 계획 불일치)`);
+            const protos = (unit ? unit.slots : rootRefs).slice(range.start, range.end + 1);
             if (arr.length === 0) {
               if (b.onEmpty === 'keep') break;
               if (b.onEmpty === 'remove') {
@@ -240,18 +235,18 @@ export async function convertBytes(
             const copies: TRef[][] = arr.map((_, k) =>
               k === 0 ? protos : protos.map((_, j) => track(first + k * m + j)),
             );
-            // 바깥 문맥(모든 조상)이 복제본의 표도 자기 것으로 알도록 한다
+            // 바깥 문맥(모든 조상)의 전체 목록(쪽 나눔·그림 위치용)에 복제본의 표도 넣는다. 위치 지정용 slots는 그대로다
             if (added)
               for (let p = unit; p; p = p.parent) {
-                const at = p.tables.indexOf(protos[m - 1]);
-                if (at >= 0) p.tables.splice(at + 1, 0, ...copies.slice(1).flat());
+                const at = p.all.indexOf(protos[m - 1]);
+                if (at >= 0) p.all.splice(at + 1, 0, ...copies.slice(1).flat());
               }
             units += arr.length;
             cloned += arr.length - 1;
             // 뒤쪽 복제본부터 채운다: 안쪽 복제·삭제가 앞쪽 복제본의 위치를 바꾸지 않는다
             for (let k = arr.length - 1; k >= 0; k--) {
               const item = arr[k];
-              const u: Unit = { tables: copies[k], parent: unit };
+              const u: Unit = { slots: copies[k], all: [...copies[k]], parent: unit };
               run(
                 (b.do ?? []) as Binding[],
                 [item, ...scopes],
@@ -259,7 +254,7 @@ export async function convertBytes(
                 `${path}.do`,
                 firstCapture(item) ?? `${String(b.over)}-${k + 1}`,
               );
-              for (const t of u.tables) {
+              for (const t of u.all) {
                 if (t.removed) continue;
                 s.setTablePageBreak(refOf(t), output.tablePageBreak);
                 splitTables.push(t);
@@ -268,7 +263,7 @@ export async function convertBytes(
             break;
           }
           case 'cells': {
-            const target = b.in ? one(unit, b.in as Locator, `${path}.in`) : singleTable(unit, path, 'cells');
+            const target = slot(unit, plan.tables.get(path), path);
             const ref = refOf(target);
             const lo: LabelOptions = {
               labelColumn: b.labelColumn as number | undefined,
@@ -330,7 +325,7 @@ export async function convertBytes(
             break;
           }
           case 'rows': {
-            const target = b.in ? one(unit, b.in as Locator, `${path}.in`) : singleTable(unit, path, 'rows');
+            const target = slot(unit, plan.tables.get(path), path);
             const ref = refOf(target);
             const headerRows = (b.headerRows as number | undefined) ?? 1;
             const r0 = headerRows + ((b.templateRow as number | undefined) ?? 0);
@@ -449,7 +444,7 @@ export async function convertBytes(
             const target = b.target as Locator;
             rowOps = true;
             if (target.row) {
-              const t = b.in ? one(unit, b.in as Locator, `${path}.in`) : singleTable(unit, path, 'remove');
+              const t = slot(unit, plan.tables.get(path), path);
               const ref = refOf(t);
               const label = (target.row.label ?? '').trim();
               const rows = [
@@ -474,7 +469,8 @@ export async function convertBytes(
               for (const e of expectedBlocks) if (e.t === t) delete e.values[label];
               for (const e of expectedLists) if (e.t === t) e.cells = [];
             } else {
-              for (const t of find(unit, target).sort((a, z) => z.index - a.index)) {
+              const t = slot(unit, plan.removeTables.get(path), path);
+              if (!t.removed) {
                 s.deleteTable(refOf(t));
                 t.removed = true;
                 shift(t.index, -1);
@@ -533,7 +529,7 @@ export async function convertBytes(
               add('renderer-missing', severity(profile.policy.onMissingRenderer), path, '다이어그램 렌더러가 없음');
               break;
             }
-            const live = unit.tables.filter((t) => !t.removed);
+            const live = unit.all.filter((t) => !t.removed);
             if (live.length) pending.push({ t: live[live.length - 1], name: unitName, sources });
             break;
           }
@@ -657,13 +653,9 @@ interface TRef {
 
 /** repeat의 복제본 하나가 가진 표들 (바인딩의 문맥) */
 interface Unit {
-  tables: TRef[];
+  /** 이 복제본 자신의 표들(양식의 단위 안 순서). 계획의 위치(pos)는 이것을 가리킨다 */
+  slots: TRef[];
+  /** slots + 안쪽 repeat이 만든 복제 표(문서 순서). 쪽 나눔·그림 위치에 쓴다 */
+  all: TRef[];
   parent: Unit | null;
-}
-
-/** in 없이 쓰는 cells·rows·remove는 문맥의 표가 하나일 때 그 표를 쓴다 */
-function singleTable(unit: Unit | null, at: string, kind: string): TRef {
-  const live = unit?.tables.filter((t) => !t.removed) ?? [];
-  if (live.length !== 1) throw new Error(`${at}: ${kind}는 in으로 표를 지정해야 함 (문맥의 표 ${live.length}개)`);
-  return live[0];
 }

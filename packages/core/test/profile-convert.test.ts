@@ -290,13 +290,16 @@ classDiagram
     ]);
   });
 
-  it('쓰이지 않은 제목은 경고, kv 중복 키는 위반', () => {
+  it('쓰이지 않은 제목은 위반(내용이 조용히 사라지지 않게), kv 중복 키도 위반', () => {
     const r = readMarkdown(
       simple,
       '## A-1 이름\n\n| k | v |\n|---|---|\n| a | b |\n| a | c |\n\n### 흐름\n\n- 하나\n\n### 기타\n',
     );
-    expect(r.warnings.map((w) => w.message)).toEqual(['알 수 없는 제목 무시: 기타']);
-    expect(r.violations.map((v) => v.message)).toEqual(['키가 중복됨: a']);
+    expect(r.warnings).toEqual([]);
+    expect(r.violations.map((v) => v.message)).toEqual([
+      '키가 중복됨: a',
+      expect.stringContaining("알 수 없는 제목: '기타'"),
+    ]);
   });
 });
 

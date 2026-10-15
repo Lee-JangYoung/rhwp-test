@@ -97,6 +97,8 @@ example.md        # 예제 md
 | `parseProfile(text)` | YAML 문법과 스키마를 검증하고 기본값을 채운다. 오류에 **줄 번호** |
 | `checkProfile(engine, profile, template)` | 양식 대조 점검. 오류는 `code`·`path`·`line`·`id`·`candidates`(양식에서 찾은 가까운 라벨·누름틀 등)를 가진 JSON |
 
+**점검=변환**: `checkProfile`이 풀어낸 표 위치(`plan`)를 변환이 그대로 쓰므로 점검을 통과한 프로필은 같은 표를 가리킨다([I-9](../07-implementation/I-9-plan-and-strict-md.md)). md는 읽지 않는 제목·코드 블록을 위반으로 알린다.
+
 **루프**: 초안 → `parseProfile`/`checkProfile` 오류 → 후보를 보고 수정 → 통과할 때까지 반복. 통과해도 변환 결과가 맞다는 보장은 아니므로 예제 md로 변환해 보는 드라이런(`testProfile`, I-3)과 사람의 확인이 필요하다.
 
 **사람이 고칠 때**: 평평한 YAML이고 바인딩은 서로 독립이다(선택적 `id`로 가리킨다). 도구는 프로필 파일을 다시 쓰지 않는다(주석 보존). 고친 뒤 같은 점검을 다시 돌린다. 제품 내 LLM 생성·검토(`@yangsik/author`의 `generateProfile`)는 같은 함수를 도구로 쓰며, 반복 횟수·토큰 상한과 검토 보고서(커버리지·드라이런·근거)를 만든다. 상세와 현재 검증 범위는 [I-A](../07-implementation/I-A-profile-authoring.md).
