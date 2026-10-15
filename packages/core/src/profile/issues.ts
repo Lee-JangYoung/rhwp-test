@@ -48,6 +48,38 @@ export const ISSUE_CODES = {
     summary: '위치 지정에 맞는 표가 여러 개',
     fix: '더 구체적인 위치 지정(다른 label·headerLabel·index)을 쓴다.',
   },
+  'slot-ambiguous': {
+    summary: '같은 영역의 같은 종류 슬롯이 여러 개인데 일부가 선택(optional)',
+    fix: '슬롯마다 under(하위 제목)로 영역을 나누거나, 모두 필수로 한다. 선택 슬롯이 없으면 뒤 슬롯이 앞 슬롯의 표·목록으로 잘못 읽힌다.',
+  },
+  'target-removed': {
+    summary: '앞선 remove가 지울 수 있는 표·라벨을 뒤에서 씀',
+    fix: '그 표·라벨을 쓰는 바인딩(cells·rows 등)을 remove보다 앞에 둔다.',
+  },
+  'label-ambiguous': {
+    summary: '표 안에 같은 라벨·머리글이 여러 개',
+    fix: '양식에서 라벨·머리글을 서로 다른 텍스트로 만들거나, 해당 라벨을 매핑하지 않는다.',
+  },
+  'merged-cell': {
+    summary: '견본 행의 병합 셀 때문에 행 복제로 채울 수 없음',
+    fix: '견본 행에 세로 병합 셀이 없도록 양식을 고친다.',
+  },
+  'token-not-found': {
+    summary: '양식에 없는 치환 토큰({{이름}})',
+    fix: '양식 분석의 tokens에 있는 이름만 쓴다.',
+  },
+  'paragraph-not-found': {
+    summary: '양식에 없는 문단',
+    fix: '양식 분석의 paragraphs에 있는 문단 텍스트(표식)를 그대로 쓴다.',
+  },
+  'yaml-ambiguous-key': {
+    summary: 'YAML이 문자열이 아닌 값(null·true·숫자)으로 읽는 키',
+    fix: "양식 라벨이 NULL·Yes·No·숫자처럼 보이면 따옴표로 감싼다(예: 'NULL': '{NULL}').",
+  },
+  'range-invalid': {
+    summary: 'range(표 묶음)의 시작·끝이 맞지 않음',
+    fix: '시작 표가 끝 표보다 앞에 오도록 하고, 둘 다 같은 문맥(바깥 repeat 단위) 안의 표로 지정한다.',
+  },
   'locator-required': { summary: '양식 위치 지정이 필요함', fix: '`in`으로 표를 지정하거나, repeat의 do 안에서 쓴다.' },
   'label-not-found': {
     summary: '표에 없는 라벨',

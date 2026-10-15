@@ -265,7 +265,7 @@
         },
         "range": {
           "type": "object",
-          "description": "시작~끝 사이의 연속 본문 요소(미지원)",
+          "description": "시작 표~끝 표 사이의 표 전부(repeat.unit에서 지원: 표 묶음을 통째로 복제). start·end는 table 위치 지정",
           "properties": {
             "start": {
               "$ref": "#/$defs/locator"
@@ -466,7 +466,7 @@
             },
             "unit": {
               "$ref": "#/$defs/locator",
-              "description": "복제할 양식 영역의 위치. 현재 지원: { table: ... }"
+              "description": "복제할 양식 영역의 위치. 지원: { table: ... } 또는 { range: { start: {table}, end: {table} } }"
             },
             "onEmpty": {
               "enum": [
@@ -475,7 +475,7 @@
                 "keep"
               ],
               "default": "error",
-              "description": "항목이 없을 때: error=오류, remove=영역 삭제(미지원), keep=그대로"
+              "description": "항목이 없을 때: error=오류, remove=영역(표)을 삭제, keep=그대로"
             },
             "do": {
               "type": "array",
@@ -541,13 +541,13 @@
             },
             "in": {
               "$ref": "#/$defs/locator",
-              "description": "행을 반복할 표의 위치"
+              "description": "행을 반복할 표의 위치. 생략하면 바깥 repeat의 단위(표 하나일 때)"
             },
             "headerRows": {
               "type": "integer",
-              "description": "머리행 수",
+              "description": "머리행 수. 열 머리글은 그 마지막 머리행에서 찾는다",
               "default": 1,
-              "minimum": 0
+              "minimum": 1
             },
             "templateRow": {
               "type": "integer",
@@ -557,20 +557,36 @@
             },
             "over": {
               "type": "string",
-              "description": "레코드 목록의 경로(records 슬롯)"
+              "description": "레코드 목록의 경로: records 슬롯(md 표의 행) 또는 컬렉션(항목마다 한 행)"
             },
             "columns": {
               "type": "object",
-              "description": "양식 열 머리글 → 레코드 키",
+              "description": "양식 열 머리글 → 값 표기. 레코드의 값은 '{이름}'처럼 md 표 머리글로, 행 번호는 '{#}'",
               "additionalProperties": {
-                "type": "string",
-                "description": "레코드 키"
+                "$ref": "#/$defs/valueSpec"
               }
+            },
+            "onEmpty": {
+              "enum": [
+                "clear",
+                "keep",
+                "removeRow",
+                "error"
+              ],
+              "default": "clear",
+              "description": "레코드가 없을 때: clear=견본 행을 비움, keep=그대로, removeRow=견본 행 삭제, error=오류"
+            },
+            "unmappedValue": {
+              "enum": [
+                "clear",
+                "keep"
+              ],
+              "default": "clear",
+              "description": "columns에 없는 열: clear=견본 행의 안내 문구를 비움, keep=그대로 둠"
             }
           },
           "required": [
             "kind",
-            "in",
             "over",
             "columns"
           ],
@@ -589,11 +605,11 @@
             },
             "at": {
               "$ref": "#/$defs/locator",
-              "description": "채울 문단의 위치"
+              "description": "바꿀 문단의 위치. 지원: { paragraph: { text: '표식' } } (그 텍스트가 든 첫 본문 문단)"
             },
             "from": {
               "type": "string",
-              "description": "목록·서술 슬롯의 경로"
+              "description": "front-matter 값의 경로(예: meta.notes). 목록이면 항목마다 한 문단, 문자열이면 줄마다 한 문단"
             },
             "format": {
               "enum": [
@@ -605,6 +621,15 @@
               ],
               "default": "plain",
               "description": "표기 형식"
+            },
+            "onEmpty": {
+              "enum": [
+                "clear",
+                "keep",
+                "error"
+              ],
+              "default": "clear",
+              "description": "값이 없을 때: clear=문단을 비움, keep=그대로, error=오류"
             }
           },
           "required": [
@@ -625,9 +650,13 @@
               "type": "string",
               "description": "바인딩 이름(선택). 오류 메시지와 대화에서 가리키는 용도"
             },
+            "in": {
+              "$ref": "#/$defs/locator",
+              "description": "target이 row일 때 그 행이 있는 표. 생략하면 바깥 repeat의 단위(표 하나일 때)"
+            },
             "target": {
               "$ref": "#/$defs/locator",
-              "description": "삭제할 영역의 위치"
+              "description": "삭제할 영역: { row: { label } } 또는 { table: ... }"
             },
             "when": {
               "type": "string",
@@ -653,13 +682,9 @@
               "type": "string",
               "description": "바인딩 이름(선택). 오류 메시지와 대화에서 가리키는 용도"
             },
-            "in": {
-              "$ref": "#/$defs/locator",
-              "description": "토큰을 찾을 영역"
-            },
             "map": {
               "type": "object",
-              "description": "토큰 이름 → 값",
+              "description": "토큰 이름 → 값 표기. 양식의 '{{이름}}'이 값으로 바뀐다",
               "additionalProperties": {
                 "$ref": "#/$defs/valueSpec"
               }

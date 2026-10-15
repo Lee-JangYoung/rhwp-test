@@ -9,7 +9,7 @@
 | S-01 | 양식 로드 시 `getStyleList`/`getFieldList`가 쓸 만한 정보를 주는가 | **부분** — 번들 템플릿 문서에서 스타일 목록(바탕글, 본문 …)과 필드 목록 반환. 실제 양식 미검증 | doctype-profile |
 | S-02 | HWPX 저장이 양식 요소(머리말·쪽번호·스타일)를 보존하는가 | **부분** — 단순 문서에서 HWP·HWPX 저장→재로드, 재저장(HWP→HWP, HWPX→HWPX), 교차 저장이 모두 쪽수·문단·컨트롤·필드·텍스트 동일, 손실 보고 0건. 외부 샘플 40개는 HWPX 왕복 39/40이며 쪽번호 컨트롤이 7→4로 줄었는데도 손실 보고가 0건이었다(S-19). 머리말·복합 스타일 미검증. **HWPX에 비표준 파일 `META-INF/rhwp-hwp5-origin`이 포함됨 — 한컴이 무시하고 여는지 미확인** | known-limitations L-04, adr-0010 |
 | S-03 | `applyStyle`로 양식 스타일을 정확히 적용하는가 | 미검증 | adr-0002 |
-| S-04 | `insertPictureEx` 지원 확장자·크기 단위, Mermaid PNG 삽입 | **부분** — PNG 삽입 성공(Mermaid 렌더 PNG 포함), HWP·HWPX 재로드 후 그림 유지, `renderPageSvg`에 `<image>` 포함. 폭은 HWPUNIT. **기본값이 떠 있는 개체(용지 기준)라 표를 덮는다 → `setPictureProperties({treatAsChar:true})` 필요(S-20).** 브라우저에서도 Mermaid→PNG→삽입 성공(S-18). JPG/GIF/SVG, 큰 이미지 쪽 넘김, 한컴 표시 미검증 | ir-spec, mermaid |
+| S-04 | `insertPictureEx` 지원 확장자·크기 단위, Mermaid PNG 삽입 | **부분** — PNG 삽입 성공(Mermaid 렌더 PNG 포함), HWP·HWPX 재로드 후 그림 유지, `renderPageSvg`에 `<image>` 포함. 폭은 HWPUNIT. **기본값이 떠 있는 개체(용지 기준)라 표를 덮는다 → `setPictureProperties({treatAsChar:true})` 필요(S-20).** 브라우저에서도 Mermaid→PNG→삽입 성공(S-18). JPG/GIF/SVG, 큰 이미지 쪽 넘김, 한컴 표시 미검증 | data-model, mermaid |
 | S-05 | 표 생성·셀 텍스트·머리행 서식, 쪽 넘김 | **부분** — `createTable`, `insertTextInCell`, 행 추가·삭제, 표 복제 성공. 머리행 서식 미검증. **조판은 `pageBreak` 값을 무시하고 "글자처럼 취급" 표를 쪽 경계에서 나누지 않음(S-20)** | md-element-mapping |
 | S-06 | 목록(번호/글머리표) 적용 방법, 3단계 중첩 | 미검증 | md-element-mapping |
 | S-07 | 문서 끝에 순차 추가(1,000문단) | 미검증 | engine-interface |
@@ -30,16 +30,21 @@
 | S-20 | 조판 보정(그림 배치, 표 높이, 쪽 나눔) | **성공(rhwp 내)** — (1) 그림 `treatAsChar:true` 필요, (2) 셀 내용을 바꿔도 표 저장 높이가 낡아 뒤따르는 개체가 표를 가림 → 셀 높이를 `getTableCellBboxes` 렌더 높이로 설정(`fitTableHeights`), (3) `pageBreak`=CELL(2) 설정은 되지만 조판은 값을 무시하고 "글자처럼 취급" 표를 나누지 않음 → 쪽을 넘는 반복 블록은 떠 있는 표 + CELL. 한컴 동작 미확인. 한컴 표본 표 403개 중 `pageBreak` CELL 377, 떠 있는 표 58%/글자처럼 취급 42% | adr-0012, L-13~L-15 |
 | S-21 | 글꼴 동적 추가, 에디터 내보내기 | **부분** — 사용자 `.ttf`를 `FontFace`로 등록하고 SVG `@font-face`(data URI)로 Mermaid 그림에 반영(25자 부분 글꼴로 시험, 5 MB 전체 글꼴은 미확인). 에디터(iframe)에는 적용 불가. `editor.exportHwpx()` 결과는 ZIP이고 재로드 시 표 3개 확인, 사람이 고친 내용이 담기는지는 미확인. `suppressDialogs:false`로 로컬 글꼴 감지 흐름이 로드를 멈추지 않음만 확인 | web-ui, L-18 |
 | S-22 | Artifact(제한 프레임)에서 웹 PoC가 동작하는가 | 미검증 — 게시 완료, 화면 확인 대기. 예상: 외부 iframe 임베드·다운로드 제한 | web-ui |
-| S-23 | **한컴에서 열림·표시**(P6): 합성 양식 산출물 5개(표 높이 맞춤 유무, 떠 있는 표/글자처럼 취급 비교 포함), 비표준 항목 `META-INF/rhwp-hwp5-origin`, 비어 있는 `lineseg` 처리 | **미검증** — 한컴 환경에서 사람이 확인해야 함. "한컴과 거의 동일"의 판정 근거 | 전체 |
+| S-23 | **한컴에서 열림·표시**(P6): 합성 양식 산출물 5개(표 높이 맞춤 유무, 떠 있는 표/글자처럼 취급 비교 포함), 비표준 항목 `META-INF/rhwp-hwp5-origin`, 비어 있는 `lineseg` 처리 | **미검증** — 한컴 환경에서 사람이 확인해야 함. 확인 키트(산출물 7개, 점검표, 결과 양식)는 [hancom-kit](../../kit/hancom/README.md)에 준비됨. "한컴과 거의 동일"의 판정 근거 | 전체 |
 | S-24 | 런타임·패키지 매니저 호환(Node 24 LTS, pnpm 12) | **부분** — Node 24.22.0에서 타입체크·vitest 10개·웹 빌드·Playwright 3개 통과. pnpm 10.28·12.11.2에서 설치 성공하나 pnpm 12는 빌드 스크립트 허용 설정(`esbuild`, `puppeteer`) 없이는 오류로 중단, 암묵 의존성 `mdast` 타입 누락이 드러남(`@types/mdast` 명시 필요). Node 26은 미시험 | adr-0013 |
 | S-25 | 프로필 형식 v1(바인딩 트리)이 유스케이스 양식을 표현하고, 점검이 LLM 전형 오류를 잡는가 | **부분** — 합성 유스케이스 양식에서 스키마·점검 통과, 전형 오류 12종과 YAML 문법 오류를 코드·경로·후보·줄 번호로 보고(자동 시험). 클래스·DB 명세서·목록 문서 형태는 **스키마 표현까지만**(점검은 미검증 kind라 거부). I-3: 프로필만으로 유스케이스 변환이 이전(하드코딩) 결과와 **ZIP 항목 SHA-256까지 동일**(골든 시험, 가짜 렌더러), 프로필을 바꾸면 라벨·누름틀·번호 형식·정책이 바뀜(자동 시험), 점검 실패는 변환 거부. **LLM이 실제로 이 형식으로 쓸 수 있는지(R-03)와 가이드·도구의 환각 감소 효과는 미검증** | doctype-profile, adr-0016 |
+| S-26 | 제품 내 LLM 프로필 생성 루프(`@yangsik/author`) | **부분** — 가짜 모델로 루프·종료 조건·오류 복구·A/B/C 경로·전송 미리보기·비전송 원칙을 자동 시험(12개). **실제 모델 호출은 미검증**(이 환경에 API 키 없음): 도구 호출/구조화 출력/스트리밍/사용량, LangChain 경유 Claude Opus 5.5(강제 tool_choice·샘플링 파라미터), 생성 품질·비용. 측정 스크립트 `packages/author/scripts/spike.ts` | I-A |
+| S-27 | 행 복제·표 묶음 복제·중첩·삭제·문단·토큰 (I-5) | **성공(rhwp 내, 합성 양식)** — `insertTableRow`로 견본 행 아래에 같은 서식의 빈 행을 만들어 채우고 저장·재로드 후 값·행 수 유지, `deleteTableRow`·`deleteTableControl`로 행·표 삭제, 표 묶음(헤더 표+목록 표+메서드 표+파라미터 표)을 `copyControl`/`pasteControl`로 복제하고 안쪽 반복·삭제를 뒤쪽 복제본부터 처리해 위치 보정, `replaceAll`(토큰)·`splitParagraph`(문단 전개) 동작. 클래스·DB 명세서(합성)가 자체 검증 통과. **한컴 열림·표시는 미확인(S-23)**, 복제본의 표 사이 문단은 복제되지 않음(L-20), 실제 SI 양식의 병합 셀·다단 머리행에서의 동작은 미검증 | I-5 |
+| S-28 | 변환 성능(합성 양식, 조판 포함, `skipDiagrams`) | **측정함 — 약점**: 유스케이스 20항목 3.1초·100항목 56.9초, 클래스 명세서 10클래스×3메서드 13.6초, DB 명세서 20테이블×20컬럼 80.1초(Node 22, 이 환경). 엔진 분리 측정(표 20/60/100개): `topTables` 호출은 무시할 수준, `setCellText` 호출당 9→39 ms, `fitTableHeights` 2.7→68.5 s, 복제 1.0→2.1 s(99회), 저장 40 ms. 즉 비용은 문서가 커질수록 커지는 편집·조판 호출에 있다. **개선(평가 3단계)**: rhwp `beginBatch()/endBatch()`로 채우기·높이 맞춤·그림 삽입을 배치 실행(편집마다 `paginate()`를 건너뜀), 표당 쪽 수만큼 부르던 `getTableCellBboxes`를 표당 1회(0쪽 호출이 이후 모든 쪽의 조각을 돌려줌, 3쪽에 걸친 표에서 합집합 동일 확인), 본문 표 목록(`topTables`)은 문단·표 구조가 바뀔 때만 다시 계산(1454회에 28 s였음). 결과(같은 입력, HWPX 바이트 동일): 유스케이스 100항목 56.9→1.0초, 클래스 30×5 → 4.1초, DB 20×20 80.1→1.8초, DB 60×30 7.0초. 시간 상한 회귀 시험 2개. 배치 안에서는 조판 결과(쪽 수·렌더 높이)를 읽을 수 없다 | 평가 |
+| S-29 | 독립 검토(변환 코어 / 어댑터 계층) 결함 재현 | **재현됨(검토 에이전트가 실험으로)**: 경로 탈출·덮어쓰기(MCP), 외부 요청(Mermaid), 추적 환경변수, `table.index`·`cells` 중복·라벨 중복·front-matter 숫자 변환·선택 슬롯 누수 등. 목록과 대응은 [evaluation-2026-10.md](../08-evaluation/evaluation-2026-10.md) §3. 검토자의 성능 원인 추측(`refOf`)은 S-28 측정으로 반박. 이 문서의 결함은 [evaluation-2026-10.md](../08-evaluation/evaluation-2026-10.md) §3의 '수정 현황'대로 1단계에서 수정·회귀 시험으로 고정(남은 것은 I-9) | 평가 |
+| S-30 | HWP 5.0 출력(`exportHwp`): HWPX 출처 문서의 CFB 저장·재로드가 HWPX와 같은가 (I-10) | **부분(rhwp 내)** — 내장 4유형(유스케이스·클래스·DB 명세서·보고서)과 확인 키트 7종(Mermaid 그림 포함)에서 `exportHwp`가 CFB 서명(`D0CF11E0…`)의 파일을 만들고, rhwp 재로드의 **표 수·표별 셀 텍스트·누름틀 값·그림 수가 HWPX 재로드와 모두 같음**(자체 검증, 시험 `core/test/hwp-output.test.ts`·CLI·MCP·웹 e2e). 다른 문서의 HWP·깨진 파일은 검증이 잡음. HWP 크기는 HWPX의 약 0.78~0.95배(7~35 KB), 저장+검증 약 70 ms. **쪽 수는 1건 다름**: 긴 표 + '글자처럼 취급' 양식(키트 04)이 HWPX 재로드 1쪽, HWP 재로드 3쪽(L-23). HWPX 출력 바이트는 `formats` 유무와 무관하게 동일. **한컴·구버전 한글에서 열림은 미확인(S-23 키트에 `.hwp` 7개 추가)** | adr-0019, L-23 |
 | R-03 | LLM 해석 초안(프로필)이 사람이 보정 가능한 품질인가 | 미검증 (양식 샘플 필요, 후순위) | adr-0006, adr-0007 |
 
 ## 진행 방식
-시험 코드는 `packages/*/test`, `packages/web/e2e`에 있고(PoC 원본은 보관 브랜치 `archive/poc-final`), 결과는 이 표만 갱신한다. S-01~S-03, S-10, R-01은 실제 양식(HWPX)이 필요하고 S-23은 한컴 환경이 필요하다. 실패 항목은 대안을 ADR로 남긴다.
+시험 코드는 `packages/*/test`, `apps/*/test`, `apps/web/e2e`에 있고(PoC 원본은 보관 브랜치 `archive/poc-final`), 결과는 이 표만 갱신한다. S-01~S-03, S-10, R-01은 실제 양식(HWPX)이 필요하고 S-23은 한컴 환경이 필요하다. 실패 항목은 대안을 ADR로 남긴다.
 
 ## 테스트 방침 (구현 단계)
-- 단위: 파서·IR·스키마 검증·렌더 계획(rhwp 불필요, Vitest)
+- 단위: md 읽기·스키마 검증·프로필 점검(rhwp 불필요, Vitest)
 - 엔진: 실제 WASM으로 편집 → 저장 → 재로드 왕복
 - 통합: `examples/` md를 변환해 골든과 비교 — 바이트가 아니라 쪽수, 쪽별 텍스트, 문단 스타일, 표 구조, 필드 값, 손실 여부
 - 브라우저: Playwright(시스템 Chromium), 시험은 `vitest`와 분리(`web/e2e`는 vitest 대상에서 제외)

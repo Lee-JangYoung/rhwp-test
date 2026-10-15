@@ -1,0 +1,9 @@
+version: 1
+type: report
+template: template.hwpx
+md:
+  frontMatter: meta
+  collections: {}
+bindings:
+  - { kind: text, map: { 작성자: '{meta.author}', 작성일: '{meta.date}' } }
+  - { kind: paragraphs, at: { paragraph: { text: '{{요약}}' } }, from: meta.summary, format: numbered }

@@ -6,15 +6,13 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./node": "./src/node/index.ts"
+    "./node": "./src/node/index.ts",
+    "./kinds": "./src/profile/kinds.ts"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json",
-    "gen:schema": "tsx scripts/gen-profile-schema.ts",
-    "gen:docs": "tsx scripts/gen-profile-docs.ts"
+    "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@rhwp/core": "catalog:",
     "@types/mdast": "catalog:",
     "ajv": "catalog:",
     "remark-frontmatter": "catalog:",
@@ -23,16 +21,7 @@
     "unified": "catalog:",
     "yaml": "catalog:"
   },
-  "peerDependencies": {
-    "@mermaid-js/mermaid-cli": "catalog:"
-  },
-  "peerDependenciesMeta": {
-    "@mermaid-js/mermaid-cli": {
-      "optional": true
-    }
-  },
   "devDependencies": {
-    "@mermaid-js/mermaid-cli": "catalog:",
     "tsx": "catalog:"
   }
 }

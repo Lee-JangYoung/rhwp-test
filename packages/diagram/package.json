@@ -1,0 +1,24 @@
+{
+  "name": "@yangsik/diagram",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    "./node": "./src/node.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "peerDependencies": {
+    "@mermaid-js/mermaid-cli": "catalog:"
+  },
+  "peerDependenciesMeta": {
+    "@mermaid-js/mermaid-cli": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@mermaid-js/mermaid-cli": "catalog:"
+  }
+}

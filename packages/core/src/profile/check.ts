@@ -4,9 +4,24 @@ import { kindByName } from './kinds';
 import { analyzeTemplate, type TemplateFacts } from './analyze';
 import type { Binding, Collection, Locator, Policy, Profile, Slot } from './types';
 
+/**
+ * 점검이 양식에서 풀어낸 위치(실행 계획). 변환은 위치 지정을 다시 해석하지 않고 이것을 그대로 쓴다.
+ * 그래서 "점검은 통과했는데 실행은 다른 표를 가리킴" 같은 불일치가 생기지 않는다.
+ * 위치(pos)는 문맥(repeat 복제본의 표들, 바깥이면 양식의 표들) 안의 순번이다.
+ */
+export interface Plan {
+  /** cells·rows·remove(row)가 쓰는 표 */
+  tables: Map<string, number>;
+  /** repeat 단위: 문맥 안의 시작~끝 표 */
+  units: Map<string, { start: number; end: number }>;
+  /** remove(table)가 지우는 표 */
+  removeTables: Map<string, number>;
+}
+
 export interface CheckResult {
   ok: boolean;
   issues: Issue[];
+  plan: Plan;
 }
 
 type Var =
@@ -32,13 +47,12 @@ function itemScope(name: string, def: Collection, parent: Scope): Scope {
   return sc;
 }
 
-/** JSON Schema에서 컬렉션 항목의 슬롯(객체)의 required 키 목록 */
+/** JSON Schema에서 컬렉션 항목의 슬롯(객체)의 required 키 목록. 하위 컬렉션은 'a.b'처럼 점으로 이어 내려간다 */
 function requiredOf(schema: object, collection: string, slotKey: string): string[] {
-  const top = collection.split('.')[0];
-  const props = (
-    schema as { properties?: Record<string, { items?: { properties?: Record<string, { required?: string[] }> } }> }
-  ).properties;
-  return props?.[top]?.items?.properties?.[slotKey]?.required ?? [];
+  type S = { items?: S; properties?: Record<string, S>; required?: string[] };
+  let node: S | undefined = schema as S;
+  for (const part of collection.split('.')) node = node?.properties?.[part]?.items;
+  return node?.properties?.[slotKey]?.required ?? [];
 }
 
 const sev = (p: Policy): Issue['severity'] | null => (p === 'ignore' ? null : p === 'warn' ? 'warning' : 'error');
@@ -85,6 +99,26 @@ export async function checkProfile(
     for (const c of captures(def.heading.pattern)) claim(c, '제목 캡처');
     for (const sl of def.slots ?? []) claim(sl.key, '슬롯');
     for (const cn of Object.keys(def.children ?? {})) claim(cn, '하위 컬렉션');
+    // 같은 영역(under)에서 표·목록은 나오는 순서로 슬롯에 대응하므로, 선택 슬롯이 앞에 있으면 뒤 슬롯과 구분되지 않는다
+    const byArea = new Map<string, Slot[]>();
+    for (const sl of def.slots ?? []) {
+      const kind =
+        sl.as === 'list' ? 'list' : sl.as === 'kv' || sl.as === 'records' || sl.as === 'table' ? 'table' : null;
+      if (!kind) continue;
+      const k = `${sl.under?.trim() ?? '\0body'}|${kind}`;
+      byArea.set(k, [...(byArea.get(k) ?? []), sl]);
+    }
+    for (const group of byArea.values())
+      if (group.length > 1 && group.some((sl) => sl.optional))
+        add(
+          'slot-ambiguous',
+          'error',
+          path,
+          `슬롯 ${group.map((g) => g.key).join(', ')}이(가) 같은 영역에 있고 일부가 선택이라 구분할 수 없음`,
+          {
+            actual: group.map((g) => g.key),
+          },
+        );
     for (const [cn, cd] of Object.entries(def.children ?? {})) conflicts(`${name}.${cn}`, cd, `${path}.children.${cn}`);
   };
   for (const [n, d] of Object.entries(profile.md.collections)) conflicts(n, d, `md.collections.${n}`);
@@ -121,35 +155,55 @@ export async function checkProfile(
 
   // 양식의 표 찾기
   type T = TemplateFacts['tables'][number];
-  const findTables = (loc: Locator): T[] | 'unsupported' => {
+  /** cands: 문맥(바깥 repeat 복제본)의 표들. 없으면 문서 전체. index는 문맥 안 순번이다 */
+  const findTables = (loc: Locator, cands: T[] = facts.tables): T[] | 'unsupported' => {
     const t = loc.table;
     if (!t) return 'unsupported';
     const col = t.column ?? 0;
     void col; // facts.labels는 0열 기준. 다른 열 지정은 현재 지원하지 않는다
-    return facts.tables.filter((x) => {
+    return cands.filter((x, pos) => {
       if (t.label !== undefined) return x.labels.includes(t.label.trim());
       if (t.headerLabel !== undefined) return x.header.includes(t.headerLabel.trim());
-      if (t.index !== undefined) return x.index === t.index;
-      if (t.text !== undefined)
-        return (
-          x.sample.some((c) => c.text.includes(t.text as string)) || x.labels.some((l) => l.includes(t.text as string))
-        );
+      if (t.index !== undefined) return pos === t.index;
+      if (t.text !== undefined) return x.texts.some((c) => c.includes(t.text as string));
       return false;
     });
   };
-  const resolveTable = (loc: Locator, at: string): T | null => {
-    const found = findTables(loc);
+  /** 위치 지정을 풀 문맥: repeat 복제본의 표들(없으면 양식 전체) */
+  interface Ctx {
+    tables: T[];
+    id: string;
+  }
+  const plan: Plan = { tables: new Map(), units: new Map(), removeTables: new Map() };
+  // 앞선 remove가 지울 수 있는 표·라벨(조건부라 "지울 수 있음"). 뒤에서 쓰면 오류
+  const goneTables = new Set<string>();
+  const goneLabels = new Map<string, Set<string>>();
+  const keyOf = (ctx: Ctx | null, t: T) => `${ctx?.id ?? 'root'}#${(ctx?.tables ?? facts.tables).indexOf(t)}`;
+  const resolveTable = (loc: Locator, at: string, ctx: Ctx | null = null): T | null => {
+    const found = findTables(loc, ctx?.tables ?? facts.tables);
     if (found === 'unsupported') {
       add(
         'kind-not-supported',
         'error',
         at,
-        `이 위치 지정은 아직 지원하지 않음 (지원: table). 지정한 키: ${Object.keys(loc).join(', ')}`,
+        `이 위치 지정은 여기서 지원하지 않음 (지원: table. range는 repeat.unit에서만). 지정한 키: ${Object.keys(loc).join(', ')}`,
       );
       return null;
     }
     if (loc.table?.column !== undefined && loc.table.column !== 0) {
       add('kind-not-supported', 'error', `${at}.table.column`, '라벨 열은 현재 0열만 지원한다');
+      return null;
+    }
+    if (found.length === 0 && ctx && findTables(loc) !== 'unsupported' && (findTables(loc) as T[]).length > 0) {
+      add(
+        'table-not-found',
+        sev(profile.policy.onMissingLabel),
+        at,
+        `이 표는 바깥 repeat 단위 안에 없음: ${JSON.stringify(loc.table)}`,
+        {
+          actual: loc.table,
+        },
+      );
       return null;
     }
     if (found.length === 0) {
@@ -183,7 +237,47 @@ export async function checkProfile(
     return found[0];
   };
 
-  const walk = (bindings: Binding[], base: string, scope: Scope, unit: T | null | 'failed') => {
+  /** repeat 단위: table 하나 또는 range(시작 표~끝 표). 문맥 안에서 찾는다 */
+  const resolveUnit = (
+    loc: Locator,
+    at: string,
+    ctx: Ctx | null,
+  ): { tables: T[]; start: number; end: number } | null => {
+    const cand = ctx?.tables ?? facts.tables;
+    if (!loc.range) {
+      const t = resolveTable(loc, at, ctx);
+      return t ? { tables: [t], start: cand.indexOf(t), end: cand.indexOf(t) } : null;
+    }
+    const a = resolveTable(loc.range.start, `${at}.range.start`, ctx);
+    const z = resolveTable(loc.range.end, `${at}.range.end`, ctx);
+    if (!a || !z) return null;
+    const i = cand.indexOf(a);
+    const j = cand.indexOf(z);
+    if (i > j) {
+      add('range-invalid', 'error', `${at}.range`, '시작 표가 끝 표보다 뒤에 있음', {
+        actual: { start: a.index, end: z.index },
+      });
+      return null;
+    }
+    return { tables: cand.slice(i, j + 1), start: i, end: j };
+  };
+
+  /** in 없이 쓴 cells·rows·remove의 표: 문맥의 표가 하나일 때 그 표 */
+  const unitTable = (ctx: Ctx | null | 'failed', at: string, kind: string, report: (m: string) => void): T | null => {
+    if (ctx === 'failed') return null;
+    if (!ctx) {
+      report(`${kind}는 in으로 표를 지정하거나 repeat의 do 안에서 써야 함`);
+      return null;
+    }
+    if (ctx.tables.length !== 1) {
+      report(`이 repeat 단위에는 표가 ${ctx.tables.length}개 있어 in으로 표를 지정해야 함`);
+      return null;
+    }
+    void at;
+    return ctx.tables[0];
+  };
+
+  const walk = (bindings: Binding[], base: string, scope: Scope, unit: Ctx | null | 'failed') => {
     bindings.forEach((b, i) => {
       const path = `${base}[${i}]`;
       const id = typeof b.id === 'string' ? b.id : undefined;
@@ -194,6 +288,18 @@ export async function checkProfile(
         message: string,
         extra: Partial<Issue> = {},
       ) => add(code, severity, p, message, { id, ...extra });
+      /** 확인한 표를 계획에 기록하고, 앞선 remove가 지울 수 있는 표면 오류 */
+      const useTable = (tbl: T | null, ctx: Ctx | null) => {
+        if (!tbl) return;
+        plan.tables.set(path, (ctx?.tables ?? facts.tables).indexOf(tbl));
+        if (goneTables.has(keyOf(ctx, tbl)))
+          here(
+            'target-removed',
+            'error',
+            path,
+            '앞선 remove가 이 표를 지울 수 있음 (이 바인딩을 remove보다 앞에 두세요)',
+          );
+      };
       const def = kindByName(b.kind);
       if (!def) return; // 스키마 단계에서 이미 unknown-kind
       if (def.status === 'defined') {
@@ -235,29 +341,50 @@ export async function checkProfile(
                 [...scope.entries()].filter(([, x]) => x.type === 'collection').map(([k]) => k),
               ),
             });
-          if (b.onEmpty === 'remove')
-            here('kind-not-supported', 'error', `${path}.onEmpty`, "onEmpty 'remove'는 아직 지원하지 않음");
-          const tbl = resolveTable(b.unit as Locator, `${path}.unit`);
-          if (next) walk((b.do ?? []) as Binding[], `${path}.do`, next, tbl ?? 'failed');
+          const outer = unit === 'failed' ? null : unit;
+          const ru = resolveUnit(b.unit as Locator, `${path}.unit`, outer);
+          if (ru) {
+            plan.units.set(path, { start: ru.start, end: ru.end });
+            if (ru.tables.some((t) => goneTables.has(keyOf(outer, t))))
+              here(
+                'target-removed',
+                'error',
+                `${path}.unit`,
+                '앞선 remove가 이 표를 지울 수 있음 (이 바인딩을 remove보다 앞에 두세요)',
+              );
+          }
+          if (next)
+            walk((b.do ?? []) as Binding[], `${path}.do`, next, ru ? { tables: ru.tables, id: path } : 'failed');
+          // 항목이 없을 때 단위를 지우는 설정이면 뒤 바인딩은 그 표를 쓸 수 없다
+          if (ru && b.onEmpty === 'remove') for (const t of ru.tables) goneTables.add(keyOf(outer, t));
           break;
         }
         case 'cells': {
-          const tbl = b.in ? resolveTable(b.in as Locator, `${path}.in`) : unit === 'failed' ? null : unit;
-          if (!b.in && !unit) {
-            here('locator-required', 'error', path, 'cells는 in으로 표를 지정하거나 repeat의 do 안에서 써야 함');
-            break;
-          }
+          const ctx = unit === 'failed' ? null : unit;
+          const tbl = b.in
+            ? resolveTable(b.in as Locator, `${path}.in`, ctx)
+            : unitTable(unit, path, 'cells', (m) => here('locator-required', 'error', path, m));
+          useTable(tbl, ctx);
           const map = (b.map ?? {}) as Record<string, unknown>;
           if (Object.keys(map).length === 0) here('binding-empty', 'error', `${path}.map`, 'map이 비어 있음');
           const labels = tbl?.labels ?? [];
           for (const [label, spec] of Object.entries(map)) {
             const at = `${path}.map.${label}`;
+            if (tbl && goneLabels.get(keyOf(ctx, tbl))?.has(label.trim()))
+              here(
+                'target-removed',
+                'error',
+                at,
+                `앞선 remove가 이 라벨의 행을 지울 수 있음: ${label} (이 바인딩을 remove보다 앞에 두세요)`,
+              );
             if (label === '*') {
               const v = typeof spec === 'string' ? resolve(spec, scope, at) : null;
               if (v && !(v.type === 'slot' && v.slot.as === 'kv'))
                 here('slot-type-mismatch', 'error', at, "'*'는 kv 슬롯(키-값 표)을 가리켜야 함", { actual: spec });
               continue;
             }
+            if (tbl && labels.filter((l) => l === label.trim()).length > 1)
+              here('label-ambiguous', 'error', at, `표에 같은 라벨이 여러 개: ${label}`, { actual: label });
             if (tbl && !labels.includes(label.trim()))
               here('label-not-found', sev(profile.policy.onMissingLabel), at, `표에 없는 라벨: ${label}`, {
                 actual: label,
@@ -305,6 +432,185 @@ export async function checkProfile(
           }
           break;
         }
+        case 'rows': {
+          const ctx = unit === 'failed' ? null : unit;
+          const tbl = b.in
+            ? resolveTable(b.in as Locator, `${path}.in`, ctx)
+            : unitTable(unit, path, 'rows', (m) => here('locator-required', 'error', path, m));
+          useTable(tbl, ctx);
+          const over = resolve(String(b.over), scope, `${path}.over`);
+          if (over && !(over.type === 'collection' || (over.type === 'slot' && over.slot.as === 'records')))
+            here(
+              'slot-type-mismatch',
+              'error',
+              `${path}.over`,
+              'rows의 over는 records 슬롯(목록형 표) 또는 컬렉션(항목마다 한 행)을 가리켜야 함',
+              { actual: b.over },
+            );
+          const columns = (b.columns ?? {}) as Record<string, unknown>;
+          if (Object.keys(columns).length === 0)
+            here('binding-empty', 'error', `${path}.columns`, 'columns가 비어 있음');
+          const headerRows = (b.headerRows as number | undefined) ?? 1;
+          const header = tbl?.rowsText[headerRows - 1];
+          if (tbl && headerRows > 4)
+            here('kind-not-supported', 'error', `${path}.headerRows`, '머리행은 4개까지만 지원한다');
+          if (tbl && header) {
+            for (const key of Object.keys(columns)) {
+              if (header.filter((h) => h === key.trim()).length > 1)
+                here(
+                  'label-ambiguous',
+                  'error',
+                  `${path}.columns.${key}`,
+                  `표 머리행에 같은 머리글이 여러 개: ${key}`,
+                  {
+                    actual: key,
+                  },
+                );
+              if (!header.includes(key.trim()))
+                here(
+                  'label-not-found',
+                  sev(profile.policy.onMissingLabel),
+                  `${path}.columns.${key}`,
+                  `표 머리행에 없는 머리글: ${key}`,
+                  {
+                    actual: key,
+                    candidates: closest(key, header),
+                  },
+                );
+            }
+            if ((b.unmappedValue ?? 'clear') === 'clear') {
+              const miss = header.filter((h) => h && !(h in columns));
+              if (miss.length)
+                here(
+                  'label-unmapped',
+                  'warning',
+                  `${path}.columns`,
+                  `columns에 없는 열(견본 행을 비움): ${miss.join(', ')}`,
+                  {
+                    actual: miss,
+                  },
+                );
+            }
+            const r0 = headerRows + ((b.templateRow as number | undefined) ?? 0);
+            if (r0 >= tbl.rows)
+              here(
+                'invalid-value',
+                'error',
+                `${path}.templateRow`,
+                `견본 행(${r0}행)이 표의 행 수(${tbl.rows})를 넘음`,
+              );
+          }
+          // 값 표기의 경로는 레코드의 키(md 표 머리글)를 쓸 수 있어 정적으로 모두 확인할 수 없다. 실행 때 확인한다.
+          break;
+        }
+        case 'remove': {
+          const ctx = unit === 'failed' ? null : unit;
+          const m = /^(empty|exists)\((.+)\)$/.exec(String(b.when));
+          if (m) resolve(m[2], scope, `${path}.when`);
+          const target = b.target as Locator;
+          if (target.row) {
+            const label = target.row.label?.trim();
+            const tbl = b.in
+              ? resolveTable(b.in as Locator, `${path}.in`, ctx)
+              : unitTable(unit, path, 'remove', (msg) => here('locator-required', 'error', path, msg));
+            useTable(tbl, ctx);
+            if (tbl && label) {
+              const k = keyOf(ctx, tbl);
+              goneLabels.set(k, (goneLabels.get(k) ?? new Set<string>()).add(label));
+            }
+            if (!label)
+              here('missing-key', 'error', `${path}.target.row`, '필수 키 누락: label', { expected: 'label' });
+            else if (tbl && !tbl.labels.includes(label))
+              here(
+                'label-not-found',
+                sev(profile.policy.onMissingLabel),
+                `${path}.target.row.label`,
+                `표에 없는 라벨: ${label}`,
+                {
+                  actual: label,
+                  candidates: closest(label, tbl.labels),
+                },
+              );
+          } else if (target.table) {
+            const t = resolveTable(target, `${path}.target`, ctx);
+            if (t) {
+              useTable(t, ctx);
+              plan.removeTables.set(path, (ctx?.tables ?? facts.tables).indexOf(t));
+              goneTables.add(keyOf(ctx, t));
+            }
+          } else
+            here(
+              'kind-not-supported',
+              'error',
+              `${path}.target`,
+              `삭제 대상은 row 또는 table만 지원함. 지정한 키: ${Object.keys(target).join(', ')}`,
+            );
+          break;
+        }
+        case 'text': {
+          if (unit) {
+            here(
+              'kind-not-supported',
+              'error',
+              path,
+              'text는 repeat 안에서 쓸 수 없음 (치환이 문서 전체에 적용되므로 복제본마다 다르게 채울 수 없다)',
+            );
+            break;
+          }
+          const map = (b.map ?? {}) as Record<string, unknown>;
+          if (Object.keys(map).length === 0) here('binding-empty', 'error', `${path}.map`, 'map이 비어 있음');
+          for (const [token, spec] of Object.entries(map)) {
+            if (!facts.tokens.includes(token.trim()))
+              here(
+                'token-not-found',
+                sev(profile.policy.onMissingLabel),
+                `${path}.map.${token}`,
+                `양식에 없는 토큰: {{${token}}}`,
+                {
+                  actual: token,
+                  candidates: closest(token, facts.tokens),
+                },
+              );
+            checkValue(spec, scope, `${path}.map.${token}`);
+          }
+          break;
+        }
+        case 'paragraphs': {
+          if (unit) {
+            here('kind-not-supported', 'error', path, 'paragraphs는 repeat 안에서 쓸 수 없음 (문단은 복제하지 않는다)');
+            break;
+          }
+          const at = b.at as Locator;
+          const marker = at.paragraph?.text;
+          if (!marker || Object.keys(at.paragraph ?? {}).some((k) => k !== 'text'))
+            here('kind-not-supported', 'error', `${path}.at`, '문단 위치는 { paragraph: { text: 표식 } }만 지원함');
+          else if (!facts.paragraphs.some((p) => p.text.includes(marker)))
+            here(
+              'paragraph-not-found',
+              sev(profile.policy.onMissingLabel),
+              `${path}.at`,
+              `양식에 없는 문단: ${marker}`,
+              {
+                actual: marker,
+                candidates: closest(
+                  marker,
+                  facts.paragraphs.map((p) => p.text),
+                ),
+              },
+            );
+          const v = resolve(String(b.from), scope, `${path}.from`);
+          if (v && v.type !== 'meta')
+            here(
+              'slot-type-mismatch',
+              'error',
+              `${path}.from`,
+              'paragraphs의 from은 front-matter 값(meta.…)이어야 함',
+              {
+                actual: b.from,
+              },
+            );
+          break;
+        }
         case 'diagrams': {
           const v = resolve(String(b.from), scope, `${path}.from`);
           if (v && !(v.type === 'slot' && v.slot.as === 'code'))
@@ -332,5 +638,5 @@ export async function checkProfile(
   };
   for (const [n, d] of Object.entries(profile.md.collections)) scan(n, d, `md.collections.${n}`);
 
-  return { ok: !issues.some((x) => x.severity === 'error'), issues };
+  return { ok: !issues.some((x) => x.severity === 'error'), issues, plan };
 }

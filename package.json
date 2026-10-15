@@ -14,7 +14,13 @@
     "format:check": "biome format .",
     "test": "vitest run",
     "build": "pnpm -r build",
-    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test"
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test",
+    "yangsik": "node apps/cli/bin/yangsik.mjs",
+    "gen:schema": "pnpm --filter @yangsik/tools gen:schema",
+    "gen:docs": "pnpm --filter @yangsik/tools gen:docs",
+    "gen:templates": "pnpm --filter @yangsik/tools gen:templates",
+    "gen:profiles": "pnpm --filter @yangsik/tools gen:profiles",
+    "kit:hancom": "pnpm --filter @yangsik/tools kit:hancom"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",

@@ -1,0 +1,25 @@
+{
+  "name": "@yangsik/cli",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "start": "node bin/yangsik.mjs"
+  },
+  "dependencies": {
+    "@mermaid-js/mermaid-cli": "catalog:",
+    "@yangsik/core": "workspace:*",
+    "@yangsik/diagram": "workspace:*",
+    "@yangsik/engine-rhwp": "workspace:*",
+    "@yangsik/hwp": "workspace:*",
+    "tsx": "catalog:"
+  },
+  "bin": {
+    "yangsik": "./bin/yangsik.mjs"
+  },
+  "optionalDependencies": {
+    "@yangsik/author": "workspace:*"
+  }
+}

@@ -1,14 +1,22 @@
-# CLI: md2hwp (가설)
+# CLI: yangsik
 
-옵션과 출력은 구현 시 확정한다.
+결정 근거와 계획: [I-4](../07-implementation/I-4-cli.md). 코어 함수의 얇은 어댑터이며 변환 로직이 없다. 실행: `pnpm yangsik <명령>` 또는 `node apps/cli/bin/yangsik.mjs <명령>` (TS 소스를 `tsx`로 실행, 빌드 없음).
 
 ```bash
-md2hwp convert <input.md...> -p <profile> [-o out] [--report report.json] [--strict]   # 기본 출력 hwpx
-md2hwp validate <input.md> -p <profile>    # 규약 검사만
-md2hwp analyze <양식.hwpx>                  # 양식 분석 JSON(스타일·필드·표 구조) — 프로필 작성 보조
-md2hwp preview <file> [-n 0] -o out.svg
+yangsik doctor                                     # 환경 점검(rhwp, Chromium, Node)
+yangsik convert <md...> -p <profile> [-o 출력] [--format hwpx,hwp] [--report f] [--preview dir] [--no-mermaid] [--strict] [--json]
+yangsik validate <md...> -p <profile> [--strict] [--json]
+yangsik profile check <profile> [--strict] [--json]       # 문법·스키마·양식 대조 (줄 번호·후보)
+yangsik profile test <profile> [--md 예제.md] [--no-mermaid]  # 드라이런 + 매핑 대조표
+yangsik profile analyze <양식.hwpx>                 # 양식 사실 JSON
+yangsik profile kinds [--all] | guide [주제] | schema   # LLM·사람용 작성 자료
+yangsik profile generate --template 양식.hwpx --example-md 예제.md --provider <anthropic|openai|ollama> --model <id> --allow-send [--out 폴더]
 ```
 
-- 종료 코드: `0` 성공(경고 가능) · `1` 입력/설정 오류 · `2` 변환·저장 검증 실패 · `3` `--strict`에서 경고
-- 리포트(JSON): 출력 경로, 포맷, rhwp 버전, 쪽수, 재로드 검증, 손실 여부, 경고, 누락 스타일
-- 네트워크를 사용하지 않는다. 양식 자동 도출(`init`)은 후순위.
+- `-o`: 하나뿐이고 `.hwpx`로 끝나면 그 파일, 아니면 폴더(기본 `out/`)에 md 이름으로 쓴다. 여러 md 중 일부가 위반이어도 나머지는 변환하고 종료 코드는 가장 나쁜 것을 따른다.
+- `--format`: 기본 `hwpx`. `hwpx,hwp`면 같은 이름의 `.hwp`(HWP 5.0)도 저장한다. HWPX는 항상 만든다. HWP는 HWPX 재로드와 내용(표·셀·필드·그림)이 같을 때만 쓰고, 다르면 쓰지 않고 종료 코드 2. 쪽 수 차이는 `⚠` 경고만 한다([I-10](../07-implementation/I-10-hwp-output.md), L-23).
+- 종료 코드: `0` 성공(경고 가능) · `1` 입력/설정 오류(md 규약 위반, 프로필 오류, 인자 오류) · `2` 변환은 했으나 자체 검증 실패 · `3` 예기치 못한 오류 · `4` `--strict`에서 경고.
+- `--json`: stdout에는 JSON 하나만 나오고 사람용 문장은 stderr로 간다.
+- 네트워크는 `profile generate`에서만 쓴다. `--allow-send` 없이는 호출하지 않으며 `--print-prompt`로 전송 내용(가이드·양식 사실·예제 md, HWPX 바이너리 제외)을 미리 본다. 제공자 패키지(`@langchain/anthropic` 등)는 필요한 것만 설치하고 키는 환경변수로 준다. 결과는 `--out`에 `profile.yaml`·`review.md`·`review.json`.
+- `profile generate`: `--max-iterations`·`--max-tokens`는 1 이상의 정수, `--out`에 `profile.yaml` 등이 이미 있으면 거부(`--force`로 덮어씀). 입력 오류(없는 파일 등)는 종료 코드 1이고, 여러 md 중 일부가 실패해도 나머지를 변환하고 요약(`--json`)·보고서(`--report`)를 남긴다. 같은 이름의 md가 여러 개면 시작 전에 거부한다.
+- 미구현(후순위): `preview <hwpx>`(쪽별 SVG는 `convert --preview`로 얻음), 양식 자동 도출(`init`).

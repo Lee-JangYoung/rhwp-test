@@ -1,0 +1,27 @@
+{
+  "name": "@yangsik/mcp",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "LLM 에이전트용 MCP 서버(stdio): 프로필 작성 도구와 변환 도구. 서버는 LLM API를 부르지 않는다",
+  "bin": {
+    "yangsik-mcp": "./bin/yangsik-mcp.mjs"
+  },
+  "exports": {
+    ".": "./src/server.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "start": "node bin/yangsik-mcp.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "catalog:",
+    "@yangsik/core": "workspace:*",
+    "@yangsik/diagram": "workspace:*",
+    "@yangsik/engine-rhwp": "workspace:*",
+    "@yangsik/hwp": "workspace:*",
+    "tsx": "catalog:",
+    "zod": "catalog:"
+  }
+}

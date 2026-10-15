@@ -1,7 +1,3 @@
-/** Node 전용: 파일 입출력 변환, rhwp WASM 로더, Mermaid(mermaid-cli) 렌더러. */
-export { convert } from './convert-file';
-export type { ConvertOptions, NodeConvertReport } from './convert-file';
-export { findChromium, renderMermaid } from './mermaid';
-export { createBlankDoc, ensureRhwp, rhwpEngine } from './rhwp-node';
+/** Node 전용: 프로필 파일(YAML)과 그 옆 파일(양식·규약) 읽기. */
 export { loadProfileFile } from './profile-file';
 export type { LoadedProfile } from './profile-file';

@@ -1,0 +1,26 @@
+{
+  "name": "@yangsik/tools",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "gen:schema": "tsx gen-profile-schema.ts",
+    "gen:docs": "tsx gen-profile-docs.ts",
+    "gen:templates": "tsx make-templates.ts",
+    "gen:profiles": "tsx write-example-profiles.ts",
+    "kit:hancom": "tsx hancom-kit.ts",
+    "author:spike": "tsx author-spike.ts"
+  },
+  "dependencies": {
+    "@yangsik/author": "workspace:*",
+    "@yangsik/core": "workspace:*",
+    "@yangsik/diagram": "workspace:*",
+    "@yangsik/engine-rhwp": "workspace:*",
+    "@yangsik/hwp": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "catalog:"
+  }
+}

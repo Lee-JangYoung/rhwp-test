@@ -1,5 +1,5 @@
 import { ISSUE_CODES } from './issues';
-import { KINDS, MINIMAL_USECASE, type KindDef } from './kinds';
+import { CLASS_SPEC, DB_SPEC, KINDS, MINIMAL_USECASE, type KindDef } from './kinds';
 import { buildProfileSchema } from './schema';
 
 export interface KindDescription {
@@ -23,8 +23,17 @@ export function describeKinds(opts: { includeDefined?: boolean } = {}): KindDesc
   }));
 }
 
-export type GuideTopic = 'overview' | 'minimal' | 'keys' | 'kinds' | 'locators' | 'paths' | 'errors';
-export const GUIDE_TOPICS: GuideTopic[] = ['overview', 'minimal', 'keys', 'kinds', 'locators', 'paths', 'errors'];
+export type GuideTopic = 'overview' | 'minimal' | 'patterns' | 'keys' | 'kinds' | 'locators' | 'paths' | 'errors';
+export const GUIDE_TOPICS: GuideTopic[] = [
+  'overview',
+  'minimal',
+  'patterns',
+  'keys',
+  'kinds',
+  'locators',
+  'paths',
+  'errors',
+];
 
 type Props = Record<
   string,
@@ -105,6 +114,33 @@ const SECTIONS: Record<GuideTopic, () => string> = {
 \`\`\`yaml
 ${MINIMAL_USECASE.trimEnd()}
 \`\`\``,
+  patterns: () => `## 양식 패턴별 작성법
+
+| 양식의 모양 | 쓰는 방법 |
+|---|---|
+| 항목마다 표 하나(라벨-값) | \`repeat\`(unit: table) + \`cells\` |
+| 항목마다 여러 표(헤더 표 + 목록 표 …) | \`repeat\`의 unit을 \`{ range: { start, end } }\`(시작 표~끝 표)로 지정해 표 묶음을 복제 |
+| 표의 행 목록(속성·컬럼·파라미터) | \`rows\`: 견본 행을 레코드 수만큼 늘려 열마다 채움. 레코드 키는 md 표의 머리글(\`'{이름}'\`), 행 번호는 \`'{#}'\` |
+| 항목 안에서 다시 반복(클래스의 메서드마다 표) | \`repeat\`를 중첩. 안쪽 unit은 바깥 복제본 안의 표에서 찾는다 |
+| 선택 항목이 없으면 행·표를 지움 | \`remove\`(\`when: 'empty(경로)'\`, target: row 또는 table), 하위 항목이 없으면 \`repeat.onEmpty: remove\` |
+| 문서 전체가 하나의 목록 표 | repeat 없이 \`rows\`(\`in\`으로 표 지정, over는 컬렉션 또는 records 슬롯) |
+
+**주의**
+- repeat 안의 위치 지정(\`in\`, \`unit\`)은 그 복제본의 표들 안에서만 찾는다. 복제본마다 라벨이 같으므로 표를 가리키는 라벨·머리글은 한 묶음 안에서 서로 달라야 한다.
+- 양식의 라벨이 \`NULL\`·\`Yes\`·숫자처럼 보이면 YAML이 문자열이 아닌 값으로 읽으므로 따옴표로 감싼다(예: \`'NULL': '{NULL}'\`).
+- \`cells\`로 채운 뒤에 \`remove\`를 둔다. 표를 지우는 \`remove\`는 그 표를 쓰는 바인딩 뒤에 둔다.
+
+### 예: 클래스 명세서 (표 묶음 + 행 목록 + 중첩 반복)
+
+\`\`\`yaml
+${CLASS_SPEC.trimEnd()}
+\`\`\`
+
+### 예: DB 명세서 (행·표 삭제)
+
+\`\`\`yaml
+${DB_SPEC.trimEnd()}
+\`\`\``,
   keys: keysReference,
   kinds: () =>
     `## 동작(kind)\n\n${KINDS.map(
@@ -119,7 +155,7 @@ ${MINIMAL_USECASE.trimEnd()}
 | \`{ table: { headerLabel: X } }\` | 첫 행에 X가 있는 표 | 사용 가능 |
 | \`{ table: { index: n } }\` | 문서에서 n번째 표(0부터) | 사용 가능 |
 | \`{ table: { text: X } }\` | 표 안에 X가 들어 있는 표 | 사용 가능 |
-| \`{ range: { start, end } }\` | 시작~끝 사이의 연속 요소 | 아직 지원하지 않음 |
+| \`{ range: { start: {table}, end: {table} } }\` | 시작 표~끝 표 사이의 표 전부 | repeat.unit에서 사용 가능 |
 | \`{ paragraph: { text / style / bookmark } }\` | 문단 | 아직 지원하지 않음 |
 | \`{ row: { label: X } }\` | 표 안의 행 | 아직 지원하지 않음 |
 | \`{ field: X }\`, \`{ bookmark: X }\` | 누름틀, 책갈피 | 아직 지원하지 않음 |

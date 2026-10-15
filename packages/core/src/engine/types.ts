@@ -47,6 +47,25 @@ export interface DocumentSession {
   cloneTableAfter(src: TableRef, after: TableRef): TableRef;
   /** 셀 내용을 통째로 교체한다. '\n'은 셀 안 문단 나눔 */
   setCellText(t: TableRef, cellIdx: number, text: string): void;
+  /**
+   * 편집 호출 묶음을 배치로 실행한다(편집마다 조판을 다시 계산하지 않아 큰 문서에서 크게 빠르다).
+   * 배치 안에서는 조판 결과(쪽 수·렌더 높이·위치)를 읽지 말 것.
+   */
+  batch<T>(f: () => T): T;
+  /** row 행 바로 아래에 같은 서식의 빈 행을 count개 추가한다 */
+  insertRowsAfter(t: TableRef, row: number, count: number): void;
+  /** 행을 지운다 */
+  deleteRow(t: TableRef, row: number): void;
+  /** 표를 지운다(표가 든 문단은 남는다) */
+  deleteTable(t: TableRef): void;
+  /** 문서 전체(표 셀 포함)에서 query를 text로 바꾼다. 바꾼 횟수 */
+  replaceText(query: string, text: string): number;
+  /** 본문(표 셀 제외) 문단들의 텍스트 */
+  bodyParagraphs(): string[];
+  /** 본문에서 query가 든 첫 문단 번호. 없으면 -1 */
+  findParagraph(query: string): number;
+  /** 문단의 내용을 lines로 바꾼다: 첫 줄은 그 문단에, 나머지는 같은 서식의 새 문단으로 이어 붙인다 */
+  setParagraphLines(para: number, lines: string[]): void;
   /** 표 바로 뒤 새 문단에 그림을 넣는다 */
   insertImageAfter(t: TableRef, img: ImageInput): void;
   /** 표의 쪽 경계 나눔 설정. none=나누지 않음, table=나눔, cell=셀 단위로 나눔 (HWPX pageBreak NONE/TABLE/CELL) */
@@ -70,6 +89,8 @@ export interface DocumentSession {
   bodyText(): string;
   renderSvg(page: number): string;
   export(): Uint8Array;
+  /** HWP 5.0(CFB) 바이너리로 저장한다. HWPX에서 연 문서는 HWPX→HWP 변환이 자동 적용된다 */
+  exportHwp(): Uint8Array;
   dispose(): void;
 }
 
