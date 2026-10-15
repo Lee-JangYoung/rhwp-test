@@ -4,7 +4,7 @@ import mdSample from '../../fixtures/md/usecase-ok.md?raw';
 import templateUrl from '../../fixtures/templates/usecase-synthetic.hwpx?url';
 import schema from '../../schemas/usecase.schema.json';
 import { convertBytes, ValidationError, type ConvertReport } from '../../src/core';
-import { engine, previewMapping, renderDiagram, type MappingPreview } from './browser';
+import { engine, previewMapping, registerFont, renderDiagram, setDiagramFont, type MappingPreview } from './browser';
 
 type Tab = 'template' | 'result';
 
@@ -17,6 +17,8 @@ export function App() {
   const [result, setResult] = useState<Uint8Array | null>(null);
   const [tab, setTab] = useState<Tab>('template');
   const [status, setStatus] = useState('양식 불러오는 중…');
+  const [fonts, setFonts] = useState<string[]>([]);
+  const [localFontDialog, setLocalFontDialog] = useState(false);
   const host = useRef<HTMLDivElement>(null);
   const editor = useRef<Promise<RhwpEditor> | null>(null);
 
@@ -36,7 +38,7 @@ export function App() {
 
   const show = async (bytes: Uint8Array, name: string) => {
     try {
-      const r = await (await editor.current!).loadFile(bytes.slice().buffer, name);
+      const r = await (await editor.current!).loadFile(bytes.slice().buffer, name, { suppressDialogs: !localFontDialog });
       setStatus(`에디터 로드 완료 (${r.pageCount}쪽)`);
     } catch (e) {
       setStatus(`에디터 로드 실패: ${(e as Error).message}`);
@@ -71,6 +73,20 @@ export function App() {
     }
   };
 
+  const addFont = async (file: File | undefined) => {
+    if (!file) return;
+    const family = file.name.replace(/\.[^.]+$/, '');
+    const data = new Uint8Array(await file.arrayBuffer());
+    try {
+      await registerFont({ family, data });
+      setDiagramFont({ family, data });
+      setFonts((f) => [...f, family]);
+      setStatus(`글꼴 "${family}" 등록 (이 브라우저 탭의 메모리에만 있음, 새로 변환하면 Mermaid 그림에 적용)`);
+    } catch (e) {
+      setStatus(`글꼴 등록 실패: ${(e as Error).message}`);
+    }
+  };
+
   const download = () => {
     if (!result) return;
     const a = document.createElement('a');
@@ -87,6 +103,11 @@ export function App() {
         <div style={{ margin: '6px 0' }}>
           <button data-testid="convert" onClick={run} disabled={!template}>변환</button>{' '}
           <button data-testid="download" onClick={download} disabled={!result}>HWPX 저장</button>
+        </div>
+        <div style={{ margin: '6px 0' }}>
+          글꼴(.ttf/.otf/.woff2): <input data-testid="font" type="file" accept=".ttf,.otf,.woff,.woff2" onChange={(e) => void addFont(e.target.files?.[0])} />
+          {fonts.length > 0 && <div data-testid="fonts">등록: {fonts.join(', ')}</div>}
+          <label><input data-testid="localfont" type="checkbox" checked={localFontDialog} onChange={(e) => setLocalFontDialog(e.target.checked)} /> 에디터 로컬 글꼴 안내창 표시</label>
         </div>
         <div data-testid="status">{status}</div>
         {violations.length > 0 && <pre data-testid="violations" style={{ color: '#b00', whiteSpace: 'pre-wrap' }}>{violations.join('\n')}</pre>}
