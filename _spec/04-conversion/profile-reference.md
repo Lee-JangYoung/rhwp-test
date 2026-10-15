@@ -104,14 +104,14 @@ bindings:
 
 ### repeat — 사용 가능
 
-컬렉션의 항목 수만큼 양식 영역(현재 지원: 표 하나)을 복제하고, 복제본마다 do를 실행한다. 중첩할 수 있다.
+컬렉션의 항목 수만큼 양식 영역(표 하나, 또는 range로 시작~끝 표 묶음)을 복제하고, 복제본마다 do를 실행한다. 중첩할 수 있다(안쪽 unit은 바깥 복제본 안의 표에서 찾는다).
 
 | 키 | 종류 | 필수 | 설명 |
 |---|---|---|---|
 | `id` | string | 선택 | 바인딩 이름(선택). 오류 메시지와 대화에서 가리키는 용도 |
 | `over` | string | 필수 | 반복할 md 컬렉션 이름(md.collections의 키, 또는 바깥 항목의 하위 컬렉션) |
-| `unit` | locator | 필수 | 복제할 양식 영역의 위치. 현재 지원: { table: ... } |
-| `onEmpty` | enum(error / remove / keep) | 선택 | 항목이 없을 때: error=오류, remove=영역 삭제(미지원), keep=그대로 (기본 "error") |
+| `unit` | locator | 필수 | 복제할 양식 영역의 위치. 지원: { table: ... } 또는 { range: { start: {table}, end: {table} } } |
+| `onEmpty` | enum(error / remove / keep) | 선택 | 항목이 없을 때: error=오류, remove=영역(표)을 삭제, keep=그대로 (기본 "error") |
 | `do` | array | 필수 | 복제본마다 실행할 바인딩(이 안의 경로는 그 항목 기준) |
 
 ### diagrams — 사용 가능
@@ -125,49 +125,52 @@ bindings:
 | `place` | enum(afterUnit / atMarker) | 선택 | 삽입 위치: afterUnit=복제된 단위 바로 뒤, atMarker=at 위치(미지원) (기본 "afterUnit") |
 | `at` | locator | 선택 | place가 atMarker일 때의 위치 |
 
-### rows — 정의만 됨(아직 쓸 수 없음)
+### rows — 사용 가능
 
-표의 견본 행을 레코드 수만큼 복제해 열마다 값을 채운다(속성·메서드·컬럼 정의·개정이력). 행 복제 후 셀 채움은 미검증(I-5).
+표의 견본 행을 레코드 수만큼 복제해 열마다 값을 채운다(속성·메서드·컬럼 정의·개정이력). 값 표기는 cells.map과 같고 레코드의 키는 md 표의 머리글, 행 번호는 {#}.
 
 | 키 | 종류 | 필수 | 설명 |
 |---|---|---|---|
 | `id` | string | 선택 | 바인딩 이름(선택). 오류 메시지와 대화에서 가리키는 용도 |
-| `in` | locator | 필수 | 행을 반복할 표의 위치 |
-| `headerRows` | integer | 선택 | 머리행 수 (기본 1) |
+| `in` | locator | 선택 | 행을 반복할 표의 위치. 생략하면 바깥 repeat의 단위(표 하나일 때) |
+| `headerRows` | integer | 선택 | 머리행 수. 열 머리글은 그 마지막 머리행에서 찾는다 (기본 1) |
 | `templateRow` | integer | 선택 | 견본으로 쓸 데이터 행(머리행 다음 0부터) (기본 0) |
-| `over` | string | 필수 | 레코드 목록의 경로(records 슬롯) |
-| `columns` | object | 필수 | 양식 열 머리글 → 레코드 키 |
+| `over` | string | 필수 | 레코드 목록의 경로: records 슬롯(md 표의 행) 또는 컬렉션(항목마다 한 행) |
+| `columns` | object | 필수 | 양식 열 머리글 → 값 표기. 레코드의 값은 '{이름}'처럼 md 표 머리글로, 행 번호는 '{#}' |
+| `onEmpty` | enum(clear / keep / removeRow / error) | 선택 | 레코드가 없을 때: clear=견본 행을 비움, keep=그대로, removeRow=견본 행 삭제, error=오류 (기본 "clear") |
+| `unmappedValue` | enum(clear / keep) | 선택 | columns에 없는 열: clear=견본 행의 안내 문구를 비움, keep=그대로 둠 (기본 "clear") |
 
-### paragraphs — 정의만 됨(아직 쓸 수 없음)
+### paragraphs — 사용 가능
 
-문단(또는 문단 묶음)을 목록·서술 수만큼 채우거나 복제한다(서술형 절, 번호 목록 본문). 미검증.
+본문 문단(표식 텍스트가 든 문단)을 front-matter의 목록·서술 값으로 바꾼다. 줄마다 같은 서식의 문단이 이어진다. repeat 안에서는 쓸 수 없다(문단은 복제하지 않는다).
 
 | 키 | 종류 | 필수 | 설명 |
 |---|---|---|---|
 | `id` | string | 선택 | 바인딩 이름(선택). 오류 메시지와 대화에서 가리키는 용도 |
-| `at` | locator | 필수 | 채울 문단의 위치 |
-| `from` | string | 필수 | 목록·서술 슬롯의 경로 |
+| `at` | locator | 필수 | 바꿀 문단의 위치. 지원: { paragraph: { text: '표식' } } (그 텍스트가 든 첫 본문 문단) |
+| `from` | string | 필수 | front-matter 값의 경로(예: meta.notes). 목록이면 항목마다 한 문단, 문자열이면 줄마다 한 문단 |
 | `format` | enum(plain / numbered / bulleted / lines / join) | 선택 | 표기 형식 (기본 "plain") |
+| `onEmpty` | enum(clear / keep / error) | 선택 | 값이 없을 때: clear=문단을 비움, keep=그대로, error=오류 (기본 "clear") |
 
-### remove — 정의만 됨(아직 쓸 수 없음)
+### remove — 사용 가능
 
-조건에 따라 영역(행·표 등)을 삭제한다(선택 항목이 없을 때). 미검증.
+조건에 따라 행(표의 0열 라벨 기준) 또는 표를 삭제한다(선택 항목이 없을 때). 조건: empty(경로) 또는 exists(경로). cells로 채운 뒤에 둔다.
 
 | 키 | 종류 | 필수 | 설명 |
 |---|---|---|---|
 | `id` | string | 선택 | 바인딩 이름(선택). 오류 메시지와 대화에서 가리키는 용도 |
-| `target` | locator | 필수 | 삭제할 영역의 위치 |
+| `in` | locator | 선택 | target이 row일 때 그 행이 있는 표. 생략하면 바깥 repeat의 단위(표 하나일 때) |
+| `target` | locator | 필수 | 삭제할 영역: { row: { label } } 또는 { table: ... } |
 | `when` | string | 필수 | 조건: empty(경로) 또는 exists(경로) |
 
-### text — 정의만 됨(아직 쓸 수 없음)
+### text — 사용 가능
 
-문단 안의 토큰({{경로}})을 값으로 치환한다. 미검증(replaceOne은 표 셀에서 동작하지 않음).
+본문·표 셀 안의 토큰({{이름}})을 값으로 바꾼다. 문서 전체에 적용되므로 repeat 밖에서만 쓴다. 누름틀이 없는 양식에 쓴다.
 
 | 키 | 종류 | 필수 | 설명 |
 |---|---|---|---|
 | `id` | string | 선택 | 바인딩 이름(선택). 오류 메시지와 대화에서 가리키는 용도 |
-| `in` | locator | 선택 | 토큰을 찾을 영역 |
-| `map` | object | 필수 | 토큰 이름 → 값 |
+| `map` | object | 필수 | 토큰 이름 → 값 표기. 양식의 '{{이름}}'이 값으로 바뀐다 |
 
 ## 양식 위치 지정 (키 하나만 쓴다)
 
@@ -177,7 +180,7 @@ bindings:
 | `{ table: { headerLabel: X } }` | 첫 행에 X가 있는 표 | 사용 가능 |
 | `{ table: { index: n } }` | 문서에서 n번째 표(0부터) | 사용 가능 |
 | `{ table: { text: X } }` | 표 안에 X가 들어 있는 표 | 사용 가능 |
-| `{ range: { start, end } }` | 시작~끝 사이의 연속 요소 | 아직 지원하지 않음 |
+| `{ range: { start: {table}, end: {table} } }` | 시작 표~끝 표 사이의 표 전부 | repeat.unit에서 사용 가능 |
 | `{ paragraph: { text / style / bookmark } }` | 문단 | 아직 지원하지 않음 |
 | `{ row: { label: X } }` | 표 안의 행 | 아직 지원하지 않음 |
 | `{ field: X }`, `{ bookmark: X }` | 누름틀, 책갈피 | 아직 지원하지 않음 |
@@ -206,6 +209,10 @@ bindings:
 | `field-not-found` | 양식에 없는 누름틀 이름 | 양식 분석(`analyzeTemplate`)의 fields에 있는 이름만 쓴다. |
 | `table-not-found` | 양식에서 위치 지정에 맞는 표가 없음 | 양식 분석의 표 목록(labels, header)을 보고 위치 지정을 고친다. |
 | `table-ambiguous` | 위치 지정에 맞는 표가 여러 개 | 더 구체적인 위치 지정(다른 label·headerLabel·index)을 쓴다. |
+| `token-not-found` | 양식에 없는 치환 토큰({{이름}}) | 양식 분석의 tokens에 있는 이름만 쓴다. |
+| `paragraph-not-found` | 양식에 없는 문단 | 양식 분석의 paragraphs에 있는 문단 텍스트(표식)를 그대로 쓴다. |
+| `yaml-ambiguous-key` | YAML이 문자열이 아닌 값(null·true·숫자)으로 읽는 키 | 양식 라벨이 NULL·Yes·No·숫자처럼 보이면 따옴표로 감싼다(예: 'NULL': '{NULL}'). |
+| `range-invalid` | range(표 묶음)의 시작·끝이 맞지 않음 | 시작 표가 끝 표보다 앞에 오도록 하고, 둘 다 같은 문맥(바깥 repeat 단위) 안의 표로 지정한다. |
 | `locator-required` | 양식 위치 지정이 필요함 | `in`으로 표를 지정하거나, repeat의 do 안에서 쓴다. |
 | `label-not-found` | 표에 없는 라벨 | 표의 라벨 열(labels)에 있는 텍스트를 그대로 쓴다. 공백·철자까지 같아야 한다. |
 | `path-unknown` | md 데이터 경로를 찾을 수 없음 | `md` 절에서 선언한 컬렉션·슬롯·캡처 이름만 쓴다. 후보를 확인한다. |

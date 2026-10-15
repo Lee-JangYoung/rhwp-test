@@ -1,0 +1,41 @@
+version: 1
+type: class-spec
+template: template.hwpx
+schema: schema.json
+md:
+  frontMatter: meta
+  collections:
+    classes:
+      heading: { level: 2, pattern: '{name}' }
+      slots:
+        - { as: kv, key: fields }
+        - { as: records, key: attributes, under: 속성, optional: true }
+        - { as: code, key: diagrams, lang: mermaid }
+      children:
+        methods:
+          heading: { level: 3, pattern: '{name}' }
+          slots:
+            - { as: kv, key: fields }
+            - { as: records, key: params, under: 파라미터, optional: true }
+bindings:
+  - { kind: fields, map: { meta.title: 문서명, meta.version: 버전, meta.author: 작성자, meta.date: 작성일 } }
+  - kind: repeat
+    over: classes
+    unit: { range: { start: { table: { label: 클래스명 } }, end: { table: { headerLabel: 파라미터명 } } } }
+    do:
+      - { kind: cells, in: { table: { label: 클래스명 } }, map: { 클래스명: '{name}', '*': fields } }
+      - kind: rows
+        in: { table: { headerLabel: 속성명 } }
+        over: attributes
+        columns: { 속성명: '{이름}', 타입: '{타입}', 가시성: '{가시성}', 설명: '{설명}' }
+      - kind: repeat
+        over: methods
+        onEmpty: remove
+        unit: { range: { start: { table: { label: 메서드명 } }, end: { table: { headerLabel: 파라미터명 } } } }
+        do:
+          - { kind: cells, in: { table: { label: 메서드명 } }, map: { 메서드명: '{name}', '*': fields } }
+          - kind: rows
+            in: { table: { headerLabel: 파라미터명 } }
+            over: params
+            columns: { 파라미터명: '{이름}', 타입: '{타입}', 설명: '{설명}' }
+      - { kind: diagrams, from: diagrams }

@@ -1,0 +1,30 @@
+version: 1
+type: db-spec
+template: template.hwpx
+schema: schema.json
+md:
+  frontMatter: meta
+  collections:
+    tables:
+      heading: { level: 2, pattern: '{name}' }
+      slots:
+        - { as: kv, key: fields }
+        - { as: records, key: columns, under: 컬럼 }
+        - { as: records, key: indexes, under: 인덱스, optional: true }
+bindings:
+  - { kind: fields, map: { meta.title: 문서명, meta.version: 버전, meta.author: 작성자, meta.date: 작성일 } }
+  - kind: repeat
+    over: tables
+    unit: { range: { start: { table: { label: 테이블명 } }, end: { table: { headerLabel: 인덱스명 } } } }
+    do:
+      - { kind: cells, in: { table: { label: 테이블명 } }, map: { 테이블명: '{name}', '*': fields } }
+      - kind: rows
+        in: { table: { headerLabel: 컬럼명 } }
+        over: columns
+        columns: { 컬럼명: '{컬럼명}', 타입: '{타입}', 길이: '{길이}', 'NULL': '{NULL}', 설명: '{설명}' }
+      - kind: rows
+        in: { table: { headerLabel: 인덱스명 } }
+        over: indexes
+        columns: { 인덱스명: '{인덱스명}', 컬럼: '{컬럼}', 유니크: '{유니크}' }
+      - { kind: remove, target: { table: { headerLabel: 인덱스명 } }, when: 'empty(indexes)' }
+      - { kind: remove, in: { table: { label: 테이블명 } }, target: { row: { label: 비고 } }, when: 'empty(fields.비고)' }

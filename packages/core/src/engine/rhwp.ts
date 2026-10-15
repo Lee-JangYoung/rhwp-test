@@ -106,6 +106,50 @@ export class RhwpSession implements DocumentSession {
     });
   }
 
+  replaceText(query: string, text: string): number {
+    return (check(this.doc.replaceAll(query, text, true), 'replaceAll').count as number | undefined) ?? 0;
+  }
+
+  bodyParagraphs(): string[] {
+    const n = this.doc.getParagraphCount(0);
+    return Array.from({ length: n }, (_, i) => {
+      const len = this.doc.getParagraphLength(0, i);
+      return len > 0 ? this.doc.getTextRange(0, i, 0, len) : '';
+    });
+  }
+
+  findParagraph(query: string): number {
+    const r = JSON.parse(this.doc.searchText(query, 0, 0, 0, true, true, false)) as { found: boolean; para?: number };
+    return r.found ? (r.para ?? -1) : -1;
+  }
+
+  setParagraphLines(para: number, lines: string[]): void {
+    const d = this.doc;
+    const len = d.getParagraphLength(0, para);
+    if (len > 0) check(d.deleteText(0, para, 0, len), 'deleteText');
+    let cur = para;
+    let prev = 0;
+    lines.forEach((line, i) => {
+      if (i > 0) {
+        cur = check(d.splitParagraph(0, cur, prev), 'splitParagraph').paraIdx as number;
+      }
+      if (line.length > 0) check(d.insertText(0, cur, 0, line), 'insertText');
+      prev = line.length;
+    });
+  }
+
+  insertRowsAfter(t: TableRef, row: number, count: number): void {
+    for (let i = 0; i < count; i++) check(this.doc.insertTableRow(0, t.para, t.ctrl, row, true), 'insertTableRow');
+  }
+
+  deleteRow(t: TableRef, row: number): void {
+    check(this.doc.deleteTableRow(0, t.para, t.ctrl, row), 'deleteTableRow');
+  }
+
+  deleteTable(t: TableRef): void {
+    check(this.doc.deleteTableControl(0, t.para, t.ctrl), 'deleteTableControl');
+  }
+
   cloneTableAfter(src: TableRef, after: TableRef): TableRef {
     const d = this.doc;
     check(d.copyControl(0, src.para, '', src.ctrl), 'copyControl');

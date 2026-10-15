@@ -1,29 +1,36 @@
 import type { DocumentSession, TableRef } from '../engine/types';
 import type { Locator } from '../profile/types';
 
-/** 본문 표 중 위치 지정에 맞는 것(표 번호 포함). 지원하지 않는 위치 지정은 null. */
-export function findTables(s: DocumentSession, loc: Locator): { ref: TableRef; index: number }[] | null {
+type Cand<T> = { ref: TableRef; index: number; item: T };
+
+/**
+ * 후보 표들(문맥 안에서 문서 순서) 중 위치 지정에 맞는 것. index는 후보 안에서의 순번(0부터).
+ * 지원하지 않는 위치 지정(table 외)은 빈 목록.
+ */
+export function findTablesIn<T>(s: DocumentSession, cand: Cand<T>[], loc: Locator): Cand<T>[] {
   const t = loc.table;
-  if (!t) return null;
-  const tops = s.topTables();
-  const out: { ref: TableRef; index: number }[] = [];
-  tops.forEach((ref, index) => {
-    if (t.index !== undefined) {
-      if (index === t.index) out.push({ ref, index });
-      return;
-    }
+  if (!t) return [];
+  return cand.filter(({ ref, index }) => {
+    if (t.index !== undefined) return index === t.index;
     const cells = s.tableCells(ref);
-    const ok =
-      t.label !== undefined
-        ? cells.some((c) => c.col === 0 && c.text.trim() === t.label?.trim())
-        : t.headerLabel !== undefined
-          ? cells.some((c) => c.row === 0 && c.text.trim() === t.headerLabel?.trim())
-          : t.text !== undefined
-            ? cells.some((c) => c.text.includes(t.text as string))
-            : false;
-    if (ok) out.push({ ref, index });
+    return t.label !== undefined
+      ? cells.some((c) => c.col === 0 && c.text.trim() === t.label?.trim())
+      : t.headerLabel !== undefined
+        ? cells.some((c) => c.row === 0 && c.text.trim() === t.headerLabel?.trim())
+        : t.text !== undefined
+          ? cells.some((c) => c.text.includes(t.text as string))
+          : false;
   });
-  return out;
+}
+
+/** 본문 표 전체에서 찾는다(매핑 미리보기용). 지원하지 않는 위치 지정은 null. */
+export function findTables(s: DocumentSession, loc: Locator): { ref: TableRef; index: number }[] | null {
+  if (!loc.table) return null;
+  return findTablesIn(
+    s,
+    s.topTables().map((ref, index) => ({ ref, index, item: null })),
+    loc,
+  ).map(({ ref, index }) => ({ ref, index }));
 }
 
 export const sameRef = (a: TableRef, b: TableRef) => a.para === b.para && a.ctrl === b.ctrl;

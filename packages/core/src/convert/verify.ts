@@ -12,6 +12,14 @@ export interface Expected {
   fields: Record<string, string>;
   /** 값을 채운 표별 "라벨 → 값". table은 본문 표 순서(0부터) */
   blocks: { table: number; values: Record<string, string>; labels?: LabelOptions }[];
+  /** 치환한 토큰({{이름}}). 저장 후 남아 있으면 안 된다 */
+  tokens?: string[];
+  /** `paragraphs`로 만든 문단들(줄 목록). 저장 후 본문에 이어서 있어야 한다 */
+  paragraphs?: string[][];
+  /** `rows`로 채운 행 목록의 셀 값. table은 본문 표 순서 */
+  lists?: { table: number; cells: { row: number; col: number; text: string }[] }[];
+  /** 저장 직전 본문 표별 행 수(rows·remove를 쓴 경우만). 재로드 결과와 비교 */
+  rowCounts?: number[];
   /** 저장 후 본문 표의 총 개수 */
   tableCount: number;
   /** 쪽 나눔 설정을 기대하는 표(본문 표 순서) */
@@ -83,6 +91,51 @@ export async function verifyOutput(engine: DocumentEngine, bytes: Uint8Array, ex
         });
       }
     });
+
+    // 2-4) 치환 토큰(text), 문단(paragraphs)
+    if (exp.tokens?.length) {
+      const text = s.bodyText();
+      const left = exp.tokens.filter((t) => text.includes(t));
+      checks.push({
+        name: '치환한 토큰이 남지 않음',
+        ok: left.length === 0,
+        detail: left.length ? left.join(', ') : undefined,
+      });
+    }
+    if (exp.paragraphs?.length) {
+      const body = s.bodyParagraphs();
+      const hasRun = (lines: string[]) => body.some((_, i) => lines.every((l, k) => body[i + k] === l));
+      const bad = exp.paragraphs.filter((l) => !hasRun(l));
+      checks.push({
+        name: '문단 목록이 본문에 이어서 있음',
+        ok: bad.length === 0,
+        detail: bad.length ? `${bad.length}개 목록이 없음, 예: ${JSON.stringify(bad[0].slice(0, 2))}` : undefined,
+      });
+    }
+
+    // 2-3) 행 목록(rows) 셀 값, 표별 행 수
+    for (const { table, cells: want } of exp.lists ?? []) {
+      const t = tables[table];
+      if (!t) continue;
+      const got = new Map(s.tableCells(t).map((c) => [`${c.row},${c.col}`, c.text]));
+      const bad = want.filter((w) => got.get(`${w.row},${w.col}`) !== w.text);
+      checks.push({
+        name: `표 ${table + 1} 행 목록 값`,
+        ok: bad.length === 0,
+        detail: bad.length
+          ? `${bad.length}칸 불일치, 예: (${bad[0].row},${bad[0].col}) 기대 ${JSON.stringify(bad[0].text)} / 실제 ${JSON.stringify(got.get(`${bad[0].row},${bad[0].col}`))}`
+          : undefined,
+      });
+    }
+    if (exp.rowCounts) {
+      const now = s.analyze().tables.map((t) => t.rows);
+      const same = now.length === exp.rowCounts.length && now.every((n, i) => n === exp.rowCounts?.[i]);
+      checks.push({
+        name: '표별 행 수 저장 전후 동일',
+        ok: same,
+        detail: same ? undefined : `저장 전 ${JSON.stringify(exp.rowCounts)} / 재로드 ${JSON.stringify(now)}`,
+      });
+    }
 
     // 3) 그림 수
     checks.push({

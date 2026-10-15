@@ -12,7 +12,7 @@ import {
   parseProfile,
   type Issue,
 } from '../src/index';
-import { KINDS, MINIMAL_USECASE } from '../src/profile/kinds';
+import { CLASS_SPEC, DB_SPEC, KINDS, MINIMAL_USECASE } from '../src/profile/kinds';
 import { loadProfileFile, rhwpEngine } from '../src/node/index';
 import { profileReferenceMarkdown } from '../scripts/profile-docs';
 
@@ -20,11 +20,13 @@ const at = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 const USECASE_PROFILE = at('../../../templates/usecase/profile.yaml');
 const TEMPLATE = new Uint8Array(readFileSync(at('../../../templates/usecase/template.hwpx')));
 
-/** 텍스트 → 스키마 검증 → 양식 점검 */
-async function run(text: string) {
+const templateOf = (name: string) => new Uint8Array(readFileSync(at(`../../../templates/${name}/template.hwpx`)));
+
+/** 텍스트 → 스키마 검증 → 양식 점검 (기본 양식: usecase) */
+async function run(text: string, template: Uint8Array = TEMPLATE) {
   const r = parseProfile(text);
   if (!r.profile) return { stage: 'parse' as const, ok: false, issues: r.issues };
-  const c = await checkProfile(rhwpEngine, r.profile, TEMPLATE, { lineOf: r.lineOf });
+  const c = await checkProfile(rhwpEngine, r.profile, template, { lineOf: r.lineOf });
   return { stage: 'check' as const, ok: c.ok, issues: c.issues };
 }
 const codes = (issues: Issue[]) => issues.map((i) => i.code);
@@ -44,6 +46,11 @@ describe('프로필 로드·스키마', () => {
       onMissingRenderer: 'error',
       onUnmappedData: 'warn',
     });
+  });
+
+  it('저장소의 클래스·DB 명세서 프로필 파일이 등록부의 예제와 같다 (pnpm --filter @yangsik/core gen:profiles)', () => {
+    expect(readFileSync(at('../../../templates/class-spec/profile.yaml'), 'utf8')).toBe(CLASS_SPEC);
+    expect(readFileSync(at('../../../templates/db-spec/profile.yaml'), 'utf8')).toBe(DB_SPEC);
   });
 
   it('저장소의 유스케이스 프로필 파일이 가이드의 최소 예와 같고, 파일에서 읽힌다', () => {
@@ -68,10 +75,10 @@ describe('프로필 로드·스키마', () => {
     expect(saved).toEqual(JSON.parse(JSON.stringify(buildProfileSchema())));
   });
 
-  it('모든 kind 예제와 예제 프로필(클래스·DB·목록 문서)이 스키마를 통과한다', () => {
+  it('모든 kind 예제와 문서 유형 프로필(유스케이스·클래스·DB 명세서)이 스키마를 통과한다', () => {
     for (const k of KINDS) expect(parseProfile(k.example).issues, k.name).toEqual([]);
-    for (const f of ['class-spec', 'db-spec', 'interface-list']) {
-      const r = parseProfile(readFileSync(at(`../../../templates/_examples/${f}.profile.yaml`), 'utf8'));
+    for (const f of ['usecase', 'class-spec', 'db-spec']) {
+      const r = parseProfile(readFileSync(at(`../../../templates/${f}/profile.yaml`), 'utf8'));
       expect(r.issues, f).toEqual([]);
     }
   });
@@ -86,7 +93,7 @@ describe('점검: 양식과 대조', () => {
 
   it('verified kind 예제는 모두 점검을 통과한다(오류 없음)', async () => {
     for (const k of KINDS.filter((x) => x.status === 'verified')) {
-      const r = await run(k.example);
+      const r = await run(k.example, templateOf(k.exampleTemplate ?? 'usecase'));
       expect(
         r.issues.filter((i) => i.severity === 'error'),
         k.name,
@@ -94,15 +101,41 @@ describe('점검: 양식과 대조', () => {
     }
   });
 
-  it('defined kind(rows 등)는 점검이 "아직 지원하지 않음"으로 거부한다', async () => {
-    for (const k of KINDS.filter((x) => x.status === 'defined')) {
-      const r = await run(k.example);
-      expect(codes(r.issues), k.name).toContain('kind-not-supported');
+  it('정의만 된(defined) kind는 점검이 "아직 지원하지 않음"으로 거부한다', async () => {
+    expect(KINDS.filter((x) => x.status === 'defined')).toEqual([]); // 현재는 모두 검증됨
+    const probe = {
+      name: 'probe',
+      status: 'defined' as const,
+      summary: '시험용',
+      schema: {
+        type: 'object',
+        properties: { kind: { const: 'probe' } },
+        required: ['kind'],
+        additionalProperties: false,
+      },
+      example: 'version: 1\ntype: t\ntemplate: t.hwpx\nmd: { collections: {} }\nbindings:\n  - { kind: probe }\n',
+    };
+    KINDS.push(probe);
+    try {
+      const r = await run(probe.example);
+      expect(codes(r.issues)).toContain('kind-not-supported');
       expect(r.ok).toBe(false);
+      expect(describeKinds().map((k) => k.name)).not.toContain('probe');
+    } finally {
+      KINDS.pop();
     }
-    for (const f of ['class-spec', 'db-spec', 'interface-list']) {
-      const r = await run(readFileSync(at(`../../../templates/_examples/${f}.profile.yaml`), 'utf8'));
-      expect(codes(r.issues), f).toContain('kind-not-supported');
+  });
+
+  it('클래스·DB 명세서 프로필은 각 양식의 점검을 통과한다', async () => {
+    for (const [name, text] of [
+      ['class-spec', CLASS_SPEC],
+      ['db-spec', DB_SPEC],
+    ] as const) {
+      const r = await run(text, templateOf(name));
+      expect(
+        r.issues.filter((i) => i.severity === 'error'),
+        name,
+      ).toEqual([]);
     }
   });
 });
@@ -239,8 +272,16 @@ describe('양식 분석(LLM 입력)·kind 목록·가이드', () => {
   });
 
   it('describeKinds는 기본적으로 검증된 kind만 준다', () => {
-    expect(describeKinds().map((k) => k.name)).toEqual(['fields', 'cells', 'repeat', 'diagrams']);
-    expect(describeKinds({ includeDefined: true }).map((k) => k.name)).toContain('rows');
+    expect(describeKinds().map((k) => k.name)).toEqual([
+      'fields',
+      'cells',
+      'repeat',
+      'diagrams',
+      'rows',
+      'paragraphs',
+      'remove',
+      'text',
+    ]);
   });
 
   it('가이드는 등록부·오류 표에서 생성되고 모든 주제가 있다', () => {
@@ -249,6 +290,8 @@ describe('양식 분석(LLM 입력)·kind 목록·가이드', () => {
     for (const k of KINDS) expect(all).toContain(`### ${k.name}`);
     for (const code of Object.keys(ISSUE_CODES)) expect(all).toContain(`\`${code}\``);
     expect(getProfileGuide('minimal').markdown).toContain(MINIMAL_USECASE.trimEnd());
+    expect(getProfileGuide('patterns').markdown).toContain(CLASS_SPEC.trimEnd());
+    expect(getProfileGuide('patterns').markdown).toContain(DB_SPEC.trimEnd());
   });
 
   it('프로필 레퍼런스 문서(_spec/04-conversion/profile-reference.md)가 생성 결과와 같다 (pnpm --filter @yangsik/core gen:docs)', () => {

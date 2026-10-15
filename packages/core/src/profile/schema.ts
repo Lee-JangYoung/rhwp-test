@@ -131,7 +131,8 @@ export function buildProfileSchema(): JsonSchema {
           },
           range: {
             type: 'object',
-            description: '시작~끝 사이의 연속 본문 요소(미지원)',
+            description:
+              '시작 표~끝 표 사이의 표 전부(repeat.unit에서 지원: 표 묶음을 통째로 복제). start·end는 table 위치 지정',
             properties: { start: { $ref: '#/$defs/locator' }, end: { $ref: '#/$defs/locator' } },
             required: ['start', 'end'],
             additionalProperties: false,

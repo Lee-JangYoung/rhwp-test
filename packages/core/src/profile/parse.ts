@@ -1,5 +1,5 @@
 import { Ajv, type ErrorObject } from 'ajv';
-import { LineCounter, type Node, parseDocument } from 'yaml';
+import { isMap, isScalar, LineCounter, type Node, parseDocument, visit } from 'yaml';
 import { closest, type Issue, type IssueCode } from './issues';
 import { KINDS } from './kinds';
 import { buildProfileSchema } from './schema';
@@ -168,6 +168,24 @@ export function parseProfile(text: string): ParseResult {
       message: err.message.split('\n')[0],
     });
   }
+  if (issues.length) return { issues };
+  // YAML은 NULL·true·yes·123 같은 키를 문자열이 아닌 값으로 읽는다(양식 라벨이 이런 모양이면 따옴표가 필요하다)
+  visit(doc, {
+    Pair(_, pair) {
+      const k = pair.key;
+      if (isScalar(k) && typeof k.value !== 'string' && k.range) {
+        const raw = String(k.source ?? text.slice(k.range[0], k.range[1])).trim();
+        issues.push({
+          code: 'yaml-ambiguous-key',
+          severity: 'error',
+          path: '',
+          line: lc.linePos(k.range[0]).line,
+          message: `키 ${raw}이(가) YAML에서 문자열이 아닌 값(${k.value === null ? 'null' : typeof k.value})으로 읽힘. 따옴표로 감싸세요: '${raw}'`,
+          actual: raw,
+        });
+      }
+    },
+  });
   if (issues.length) return { issues };
   const root = doc.toJS() as unknown;
   const lineOf = (segs: (string | number)[]): number | undefined => {

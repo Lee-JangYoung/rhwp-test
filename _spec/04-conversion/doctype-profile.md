@@ -61,7 +61,7 @@ template.hwpx     # 양식
 schema.json       # md 규약(JSON Schema)
 example.md        # 예제 md
 ```
-형식 예제: 유스케이스 `templates/usecase/profile.yaml`, 클래스·DB 명세서·목록 문서 `templates/_examples/*.profile.yaml`(rows 등 미검증 kind를 쓰므로 점검은 "지원하지 않음").
+문서 유형 예제(합성 양식 포함, 변환·시험됨): `templates/usecase`(항목마다 표 1개), `templates/class-spec`(표 묶음 + 행 목록 + 중첩 반복), `templates/db-spec`(행·표 삭제), `templates/report`(토큰·문단, 프로필은 kind 예제).
 
 **구성 요소**
 - `md`: md를 이름 붙은 **컬렉션**(반복되는 제목)과 **슬롯**(kv·records·list·text·code·table)으로 읽는 규칙. 컬렉션은 중첩할 수 있다.
@@ -69,18 +69,19 @@ example.md        # 예제 md
 - `output`, `policy`: 출력 옵션, 위반 시 동작(기본 모두 `error`). 모두 생략 가능(기본값).
 - 알 수 없는 키·kind는 오류. 형식이 깨질 때만 `version`을 올린다.
 
-**kind 상태**: 사용 가능(검증됨) `fields`·`cells`·`repeat`(표)·`diagrams`. 정의만 됨(`checkProfile`이 거부): `rows`·`paragraphs`·`remove`·`text`, 위치 지정 `range`·`paragraph`·`row`·`field`·`bookmark`. 검증 순서: 스파이크 → [verification-spike.md](../06-quality/verification-spike.md) 기록 → 활성화.
+**kind 상태**: 사용 가능(검증됨, 합성 양식 기준) `fields`·`cells`·`repeat`(표·`range` 표 묶음·중첩)·`diagrams`·`rows`·`remove`·`text`·`paragraphs`. 위치 지정은 `table`(와 repeat.unit의 `range`, `remove`의 `row`, `paragraphs`의 `paragraph.text`)만 지원하고 `field`·`bookmark`·`paragraph.style` 등은 정의만 됨(점검이 거부). 새 kind는 스파이크 → [verification-spike.md](../06-quality/verification-spike.md) 기록 → 활성화 순서로 켠다.
 
 ## 반복·채움 패턴 수용 범위
 | 패턴 | 표현 | 상태 |
 |---|---|---|
 | 표지·문서 정보 | `fields` | 사용 가능 |
 | 항목마다 표 1개(유스케이스) | `repeat`(table) + `cells` | 사용 가능 |
-| 헤더 표 + 목록 표(클래스·DB 명세서) | `repeat` + `cells` + `rows` | rows 미검증(I-5) |
-| 항목 안 목록 표의 하위 반복, 문서 전체가 하나의 목록 표, 개정이력 | `repeat` 중첩, 바깥 `rows` | I-5 |
-| 선택 항목이 없으면 행·표 제거 | `remove` | 미검증 |
-| 문단·표 묶음 블록 반복 | `repeat`(range) | 미검증(R-02, S-10), 실제 양식에서 필요가 확인될 때 |
-| 서술형 절, 본문 토큰 치환 | `paragraphs`, `text` | 미검증 |
+| 항목마다 여러 표(헤더 표 + 목록 표 …) | `repeat`(unit: `range`) + `cells` + `rows` | 사용 가능(합성 양식) |
+| 표의 행 목록, 문서 전체가 하나의 목록 표, 개정이력 | `rows`(바깥이면 repeat 없이) | 사용 가능(합성 양식) |
+| 항목 안에서 다시 반복(메서드마다 표) | `repeat` 중첩 | 사용 가능(합성 양식) |
+| 선택 항목이 없으면 행·표 제거 | `remove`, `repeat.onEmpty: remove` | 사용 가능(합성 양식) |
+| 본문 토큰 치환, 표식 문단을 목록으로 전개 | `text`, `paragraphs` | 사용 가능, **repeat 밖·front-matter 값만**. 항목마다 달라지는 서술 절은 문단 복제가 필요해 미지원 |
+| 표 사이 문단까지 포함한 블록 반복 | — | 미지원(표 사이 문단은 복제하지 않음, 실제 양식에서 필요가 확인될 때) |
 | 다중 구역 양식 | — | 제외(분석 단계에서 거부) |
 
 새 패턴은 새 kind(또는 위치 지정)를 등록해 추가하며 형식 버전은 올리지 않는다.
