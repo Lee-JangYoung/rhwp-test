@@ -34,7 +34,7 @@ export function checkZipHeader(bytes: Uint8Array): Check {
   const sig = dv.getUint32(0, true) === 0x04034b50;
   const method = dv.getUint16(8, true);
   const nameLen = dv.getUint16(26, true);
-  const name = Buffer.from(bytes.subarray(30, 30 + nameLen)).toString('utf8');
+  const name = new TextDecoder().decode(bytes.subarray(30, 30 + nameLen));
   const ok = sig && method === 0 && name === 'mimetype';
   return { name: 'ZIP: 첫 항목이 무압축 mimetype', ok, detail: ok ? undefined : `sig=${sig} method=${method} name=${name}` };
 }
@@ -95,7 +95,7 @@ export async function verifyOutput(engine: DocumentEngine, bytes: Uint8Array, ex
     });
 
     // 5) 비표준 파일 (정보용)
-    const nonStandardEntry = Buffer.from(bytes).includes('rhwp-hwp5-origin');
+    const nonStandardEntry = new TextDecoder('latin1').decode(bytes).includes('rhwp-hwp5-origin');
     return { ok: checks.every((c) => c.ok), checks, pages: s.pageCount(), controlCounts: counts, nonStandardEntry };
   } finally {
     s.dispose();

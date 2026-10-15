@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { Ajv } from 'ajv';
 import type { ErrorObject } from 'ajv';
 import type { Ir } from './parse';
@@ -55,8 +54,7 @@ function describe(e: ErrorObject): string {
   }
 }
 
-export function validateIr(ir: Ir, schemaPath: string): Violation[] {
-  const schema = JSON.parse(readFileSync(schemaPath, 'utf8')) as object;
+export function validateIr(ir: Ir, schema: object): Violation[] {
   const ajv = new Ajv({ allErrors: true, strict: false });
   const validate = ajv.compile(schema);
   if (validate(toData(ir))) return [];

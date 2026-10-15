@@ -1,6 +1,4 @@
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { HwpDocument, initSync, version as rhwpVersion } from '@rhwp/core';
+import { HwpDocument, version as rhwpVersion } from '@rhwp/core';
 import type {
   CellInfo,
   PageBreakMode,
@@ -19,27 +17,6 @@ interface Ctrl {
   props?: { Height?: number };
 }
 
-let ready = false;
-
-/** WASM을 한 번만 초기화한다 (Node: initSync). */
-export function ensureRhwp(): void {
-  if (ready) return;
-  const g = globalThis as Record<string, unknown>;
-  // README는 호스트의 폭 측정 함수를 요구한다. 근사값을 둔다(실제 호출 여부는 S-11로 확인 중).
-  g.measureTextWidth ??= (_font: string, text: string) => [...text].reduce((w, c) => w + (c.charCodeAt(0) > 0x2000 ? 14 : 7), 0);
-  const wasm = fileURLToPath(new URL('../../node_modules/@rhwp/core/rhwp_bg.wasm', import.meta.url));
-  initSync({ module: readFileSync(wasm) });
-  ready = true;
-}
-
-/** 번들 템플릿 기반 빈 문서 (스타일·구역 정의 포함). 양식을 만드는 스크립트에서도 사용. */
-export function createBlankDoc(): HwpDocument {
-  ensureRhwp();
-  const d = HwpDocument.createEmpty();
-  d.createBlankDocument();
-  return d;
-}
-
 function check(result: string, what: string): Record<string, unknown> {
   const o = JSON.parse(result) as Record<string, unknown>;
   if (o.ok === false) throw new Error(`${what} 실패: ${result}`);
@@ -53,7 +30,7 @@ const PAGE_BREAK_NAME: Record<number, PageBreakMode> = { 0: 'none', 1: 'table', 
 const HWPUNIT_PER_PX = 75; // 7200 HWPUNIT/inch ÷ 96 px/inch
 const MAX_IMAGE_WIDTH_HU = 40000; // 본문 폭(약 41,954)보다 조금 작게
 
-class RhwpSession implements DocumentSession {
+export class RhwpSession implements DocumentSession {
   constructor(private readonly doc: HwpDocument) {}
 
   private controls(): Ctrl[] {
@@ -289,12 +266,23 @@ class RhwpSession implements DocumentSession {
   }
 }
 
-export const rhwpEngine: DocumentEngine = {
-  id: 'rhwp',
-  version: '', // ensureRhwp 이후 version()으로 채운다
-  async open(bytes?: Uint8Array): Promise<DocumentSession> {
-    ensureRhwp();
-    (rhwpEngine as { version: string }).version = rhwpVersion();
-    return new RhwpSession(bytes ? new HwpDocument(bytes) : createBlankDoc());
-  },
-};
+/**
+ * rhwp 엔진을 만든다. `init`은 WASM을 한 번 초기화하는 환경별 함수다(Node: initSync, 브라우저: init).
+ * 이 파일은 Node·브라우저 API를 쓰지 않는다.
+ */
+export function createRhwpEngine(init: () => void | Promise<void>): DocumentEngine {
+  let ready: Promise<void> | null = null;
+  const engine: { id: string; version: string; open: DocumentEngine['open'] } = {
+    id: 'rhwp',
+    version: '',
+    async open(bytes?: Uint8Array): Promise<DocumentSession> {
+      await (ready ??= Promise.resolve(init()));
+      engine.version = rhwpVersion();
+      if (bytes) return new RhwpSession(new HwpDocument(bytes));
+      const d = HwpDocument.createEmpty();
+      d.createBlankDocument(); // 번들 템플릿(스타일·구역 정의 포함)
+      return new RhwpSession(d);
+    },
+  };
+  return engine;
+}

@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { convert, ValidationError } from '../src/convert';
-import { rhwpEngine } from '../src/engine/rhwp';
+import { rhwpEngine } from '../src/engine/rhwp-node';
 import { findChromium } from '../src/mermaid';
 import { parseMarkdown } from '../src/parse';
 import { validateIr } from '../src/validate';
@@ -28,11 +28,11 @@ describe('P1 md 파싱·규약 검증', () => {
   it('정상 문서는 위반이 없다', () => {
     const ir = parseMarkdown(readFileSync(md('usecase-ok.md'), 'utf8'));
     expect(ir.items.map((i) => i.id)).toEqual(['UC-001', 'UC-002', 'UC-003']);
-    expect(validateIr(ir, SCHEMA)).toEqual([]);
+    expect(validateIr(ir, JSON.parse(readFileSync(SCHEMA, "utf8")))).toEqual([]);
   });
 
   it('위반 1: ID 형식과 필수 항목 누락을 줄 번호와 함께 알려준다', () => {
-    const vs = validateIr(parseMarkdown(readFileSync(md('usecase-bad1.md'), 'utf8')), SCHEMA);
+    const vs = validateIr(parseMarkdown(readFileSync(md('usecase-bad1.md'), "utf8")), JSON.parse(readFileSync(SCHEMA, "utf8")));
     expect(vs.map((v) => [v.line, v.path, v.message])).toEqual([
       [8, '/items/0/id', expect.stringContaining('형식 불일치')],
       [10, '/items/0/fields', '필수 항목 누락: 사후조건'],
@@ -40,7 +40,7 @@ describe('P1 md 파싱·규약 검증', () => {
   });
 
   it('위반 2: front-matter 누락·형식, 빈 흐름', () => {
-    const vs = validateIr(parseMarkdown(readFileSync(md('usecase-bad2.md'), 'utf8')), SCHEMA);
+    const vs = validateIr(parseMarkdown(readFileSync(md('usecase-bad2.md'), "utf8")), JSON.parse(readFileSync(SCHEMA, "utf8")));
     const msgs = vs.map((v) => v.message).join('|');
     expect(msgs).toContain('필수 항목 누락: author');
     expect(msgs).toContain('형식 불일치');

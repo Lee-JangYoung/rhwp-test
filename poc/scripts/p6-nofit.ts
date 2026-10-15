@@ -2,7 +2,7 @@
 // 한컴이 낡은 표 높이(양식의 원래 높이)를 스스로 보정하는지, 그림이 표를 가리는지 확인하는 용도.
 import { fileURLToPath } from 'node:url';
 import { convert } from '../src/convert';
-import { rhwpEngine } from '../src/engine/rhwp';
+import { rhwpEngine } from '../src/engine/rhwp-node';
 
 const at = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 const r = await convert(rhwpEngine, {

@@ -3,7 +3,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
-import { createBlankDoc } from '../src/engine/rhwp';
+import { createBlankDoc } from '../src/engine/rhwp-node';
 
 const out = process.argv[2] ?? fileURLToPath(new URL('../fixtures/templates/usecase-synthetic.hwpx', import.meta.url));
 const LABELS = ['UC ID', '유스케이스명', '액터', '사전조건', '사후조건', '기본 흐름', '대안 흐름'];

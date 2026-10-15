@@ -2,7 +2,7 @@
 // 사용법: tsx scripts/stress.ts <selection.json> <samples-root>
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { rhwpEngine } from '../src/engine/rhwp';
+import { rhwpEngine } from '../src/engine/rhwp-node';
 
 const [selFile, root] = process.argv.slice(2);
 if (!selFile || !root) throw new Error('사용법: stress.ts <selection.json> <samples-root>');

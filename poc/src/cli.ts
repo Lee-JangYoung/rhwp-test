@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { convert, ValidationError } from './convert';
-import { rhwpEngine } from './engine/rhwp';
+import { rhwpEngine } from './engine/rhwp-node';
 import { findChromium } from './mermaid';
 import { parseMarkdown } from './parse';
 import { formatViolations, validateIr } from './validate';
@@ -35,7 +35,7 @@ async function main(): Promise<number> {
     case 'validate': {
       if (!values.md) throw new Error('--md 필요');
       const ir = parseMarkdown(readFileSync(values.md, 'utf8'));
-      const vs = validateIr(ir, SCHEMA);
+      const vs = validateIr(ir, JSON.parse(readFileSync(SCHEMA, 'utf8')) as object);
       if (vs.length) {
         console.error(formatViolations(values.md, vs));
         return 1;
