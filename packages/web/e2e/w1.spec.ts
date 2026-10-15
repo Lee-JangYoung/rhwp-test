@@ -1,4 +1,5 @@
 // 웹 PoC 자동 확인 (W1~W6). 시스템 Chromium + 에이전트 프록시 사용. TLS 검증은 끄지 않는다.
+import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 
 test('W1~W6: 로드·매핑·위반·변환·저장', async ({ page }, testInfo) => {
@@ -30,6 +31,11 @@ test('W1~W6: 로드·매핑·위반·변환·저장', async ({ page }, testInfo)
   console.log('REPORT:', await page.getByTestId('report').textContent());
   const [dl] = await Promise.all([page.waitForEvent('download'), page.getByTestId('download').click()]);
   await dl.saveAs(testInfo.outputPath('result.hwpx'));
+  // I-10: 최종 변환은 HWP 5.0도 만든다 (CFB 서명)
+  const [dh] = await Promise.all([page.waitForEvent('download'), page.getByTestId('download-hwp').click()]);
+  const hwpPath = testInfo.outputPath('result.hwp');
+  await dh.saveAs(hwpPath);
+  expect(readFileSync(hwpPath).subarray(0, 4).toString('hex')).toBe('d0cf11e0');
   console.log('STATUS(결과):', await page.getByTestId('status').textContent());
   console.log(logs.slice(-20).join('\n'));
 });

@@ -75,6 +75,33 @@ describe('CLI', () => {
     expect(existsSync(join(dir, 'bad1.hwpx'))).toBe(false);
   });
 
+  it('convert --format hwpx,hwp: .hwp(CFB)도 저장하고 보고에 검증이 남는다. 잘못된 형식은 1', () => {
+    const dir = tmp();
+    const r = run([
+      'convert',
+      join(UC, 'example.md'),
+      '-p',
+      PROFILE,
+      '-o',
+      join(dir, 'a.hwpx'),
+      '--no-mermaid',
+      '--format',
+      'hwpx,hwp',
+      '--report',
+      join(dir, 'r.json'),
+    ]);
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain('HWP →');
+    expect(readFileSync(join(dir, 'a.hwp')).subarray(0, 4).toString('hex')).toBe('d0cf11e0');
+    expect(JSON.parse(readFileSync(join(dir, 'r.json'), 'utf8')).files[0].report.hwp.ok).toBe(true);
+    const plain = tmp();
+    run(['convert', join(UC, 'example.md'), '-p', PROFILE, '-o', join(plain, 'b.hwpx'), '--no-mermaid']);
+    expect(existsSync(join(plain, 'b.hwp'))).toBe(false);
+    const bad = run(['convert', join(UC, 'example.md'), '-p', PROFILE, '--format', 'pdf']);
+    expect(bad.code).toBe(1);
+    expect(bad.stderr).toContain('--format');
+  });
+
   it('convert --json: stdout에는 JSON 하나', () => {
     const dir = tmp();
     const r = run([

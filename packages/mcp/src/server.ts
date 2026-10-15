@@ -5,23 +5,23 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
   analyzeTemplate,
   buildProfileSchema,
-  convertBytes,
   checkProfile,
+  convertBytes,
   describeKinds,
   formatViolations,
-  getProfileGuide,
   GUIDE_TOPICS,
   type GuideTopic,
+  getProfileGuide,
   type Issue,
   type Profile,
-  previewMapping,
   ProfileError,
+  previewMapping,
   readMarkdown,
   testProfile,
-  validateData,
   ValidationError,
+  validateData,
 } from '@yangsik/core';
-import { findChromium, loadProfileFile, renderMermaid, rhwpEngine } from '@yangsik/core/node';
+import { findChromium, hwpPathOf, loadProfileFile, renderMermaid, rhwpEngine } from '@yangsik/core/node';
 import { z } from 'zod';
 import { PathGuard } from './paths';
 
@@ -299,20 +299,26 @@ export function createServer(opts: ServerOptions): McpServer {
   server.registerTool(
     'convert_md',
     {
-      title: 'md → HWPX 변환',
+      title: 'md → HWPX(·HWP) 변환',
       description:
-        'md를 프로필의 양식으로 변환해 out_path(.hwpx)에 저장하고 자체 검증 보고를 돌려준다. md 위반은 ok:false와 violations로, 프로필 오류는 issues로 돌려준다.',
+        'md를 프로필의 양식으로 변환해 out_path(.hwpx)에 저장하고 자체 검증 보고를 돌려준다. formats에 "hwp"를 넣으면 같은 이름의 .hwp(HWP 5.0)도 저장한다(HWPX와 일치 검증을 통과한 경우만). md 위반은 ok:false와 violations로, 프로필 오류는 issues로 돌려준다.',
       inputSchema: {
         profile_path: z.string(),
         md_path: z.string().optional(),
         md_text: z.string().optional(),
         out_path: z.string().describe('저장할 .hwpx 경로(허용 폴더 안)'),
         skip_diagrams: z.boolean().optional(),
+        formats: z
+          .array(z.enum(['hwpx', 'hwp']))
+          .optional()
+          .describe('기본 ["hwpx"]. "hwp"를 넣으면 .hwp도 저장'),
       },
     },
-    safe(async ({ profile_path, md_path, md_text, out_path, skip_diagrams }) => {
+    safe(async ({ profile_path, md_path, md_text, out_path, skip_diagrams, formats }) => {
       // 프로필·양식·규약·md는 모두 PathGuard를 거쳐 읽고, 저장 위치도 확인한 뒤에만 쓴다.
       const out = guard.write(out_path, ['.hwpx']);
+      const wantHwp = formats?.includes('hwp') ?? false;
+      const outHwp = wantHwp ? guard.write(hwpPathOf(out), ['.hwp']) : undefined;
       const p = loadProfile(guard, profile_path);
       if (p.errors.length || !p.loaded.profile) return text({ ok: false, issues: p.loaded.issues });
       if (!p.template) return text({ ok: false, issues: p.loaded.issues });
@@ -320,7 +326,11 @@ export function createServer(opts: ServerOptions): McpServer {
       const diagrams = !(skip_diagrams || findChromium() === null);
       const work = diagrams ? mkdtempSync(join(tmpdir(), 'yangsik-mcp-')) : undefined;
       try {
-        const { bytes, report: r } = await convertBytes(rhwpEngine, {
+        const {
+          bytes,
+          hwp,
+          report: r,
+        } = await convertBytes(rhwpEngine, {
           profile: p.loaded.profile,
           mdText: m.text,
           mdName: m.name,
@@ -328,12 +338,26 @@ export function createServer(opts: ServerOptions): McpServer {
           dataSchema: p.schema,
           renderDiagram: work ? async (src, name) => renderMermaid(src, work, name) : undefined,
           skipDiagrams: !diagrams,
+          formats: wantHwp ? ['hwpx', 'hwp'] : ['hwpx'],
         });
         mkdirSync(dirname(out), { recursive: true });
         writeFileSync(out, bytes);
+        // 검증을 통과한 HWP만 쓴다
+        const wroteHwp = !!(outHwp && hwp && r.hwp?.ok);
+        if (outHwp && hwp && wroteHwp) writeFileSync(outHwp, hwp);
         return text({
-          ok: r.verify.ok,
+          ok: r.verify.ok && (r.hwp?.ok ?? true),
           out: relative(guard.roots[0], out),
+          ...(wantHwp
+            ? {
+                outHwp: wroteHwp && outHwp ? relative(guard.roots[0], outHwp) : null,
+                hwp: {
+                  ok: r.hwp?.ok ?? false,
+                  failedChecks: r.hwp?.checks.filter((c) => !c.ok) ?? [],
+                  error: r.hwp?.error,
+                },
+              }
+            : {}),
           pages: r.pages,
           items: r.items,
           cellsSet: r.cellsSet,

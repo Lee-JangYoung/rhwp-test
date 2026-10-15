@@ -1,12 +1,12 @@
 import type { DocumentEngine, TableRef } from '../engine/types';
 import { readMarkdown } from '../markdown/read';
-import { formatViolations, validateData, type Violation } from '../markdown/validate';
+import { formatViolations, type Violation, validateData } from '../markdown/validate';
 import { checkProfile } from '../profile/check';
 import { closest, type Issue } from '../profile/issues';
 import type { Binding, Format, Locator, Policy, Profile, ValueSpec } from '../profile/types';
 import { duplicateLabels, type LabelOptions, labelCells } from './blocks';
-import { formatValue, getPath, type Scopes, resolveValue } from './values';
-import { type Expected, type VerifyReport, verifyOutput } from './verify';
+import { formatValue, getPath, resolveValue, type Scopes } from './values';
+import { type Expected, type HwpVerifyReport, type VerifyReport, verifyHwp, verifyOutput } from './verify';
 
 /** md가 프로필의 md 규칙·규약(JSON Schema)과 맞지 않음. 줄 번호와 함께 LLM에 되돌려 고치게 한다. */
 export class ValidationError extends Error {
@@ -58,7 +58,11 @@ export interface ConvertInput {
   output?: Partial<Omit<Profile['output'], 'diagram'>>;
   /** true면 쪽별 SVG를 만든다 */
   preview?: boolean;
+  /** 만들 출력 형식. 기본 ['hwpx']. 'hwp'는 같은 세션에서 HWP 5.0도 저장하고 자체 검증한다 */
+  formats?: OutputFormat[];
 }
+
+export type OutputFormat = 'hwpx' | 'hwp';
 
 export interface ConvertReport {
   items: number;
@@ -72,6 +76,8 @@ export interface ConvertReport {
   issues: Issue[];
   pages: number;
   verify: VerifyReport;
+  /** formats에 hwp가 있을 때만. 실패해도 HWPX 산출물은 그대로 낸다 */
+  hwp?: HwpVerifyReport & { error?: string };
   timingsMs: Record<string, number>;
 }
 
@@ -84,7 +90,7 @@ const firstCapture = (item: Record<string, unknown>): string | undefined =>
 export async function convertBytes(
   engine: DocumentEngine,
   o: ConvertInput,
-): Promise<{ bytes: Uint8Array; report: ConvertReport; previews: string[] }> {
+): Promise<{ bytes: Uint8Array; hwp?: Uint8Array; report: ConvertReport; previews: string[] }> {
   const mdName = o.mdName ?? 'input.md';
   const { profile } = o;
   const timings: Record<string, number> = {};
@@ -619,6 +625,21 @@ export async function convertBytes(
     const verify = await verifyOutput(engine, bytes, expected);
     lap('verify', t0);
 
+    // 7) HWP 5.0: 같은 세션에서 저장하고 HWPX 재로드와 비교한다. 실패는 보고만 하고 HWPX를 막지 않는다
+    let hwp: Uint8Array | undefined;
+    let hwpReport: ConvertReport['hwp'];
+    if (o.formats?.includes('hwp')) {
+      t0 = Date.now();
+      try {
+        hwp = s.exportHwp();
+        hwpReport = await verifyHwp(engine, hwp, bytes, Object.keys(expectedFields));
+      } catch (e) {
+        hwpReport = { ok: false, checks: [], notes: [], bytes: 0, error: (e as Error).message };
+        hwp = undefined;
+      }
+      lap('hwp', t0);
+    }
+
     for (const i of issues) warnings.push(`프로필 ${i.path}: ${i.message}`);
     const report: ConvertReport = {
       items: units,
@@ -631,9 +652,10 @@ export async function convertBytes(
       issues,
       pages: s.pageCount(),
       verify,
+      ...(hwpReport ? { hwp: hwpReport } : {}),
       timingsMs: timings,
     };
-    return { bytes, report, previews };
+    return { bytes, hwp, report, previews };
   } finally {
     s.dispose();
   }

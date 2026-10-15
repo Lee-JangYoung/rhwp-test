@@ -1,14 +1,14 @@
 import { parseArgs } from 'node:util';
 import { convertCmd, convertOptions } from './commands/convert';
 import { doctor } from './commands/doctor';
-import { profileCmd, profileOptions, type ProfileValues } from './commands/profile';
+import { type ProfileValues, profileCmd, profileOptions } from './commands/profile';
 import { validate, validateOptions } from './commands/validate';
 import { EXIT, inputErrorMessage, Out } from './util';
 
-const HELP = `yangsik — Markdown → 양식 HWPX 변환
+const HELP = `yangsik — Markdown → 양식 HWPX(·HWP) 변환
 
   yangsik doctor                                  환경 점검
-  yangsik convert <md...> -p <profile> [-o 출력] [--report f] [--preview dir] [--no-mermaid] [--strict] [--json]
+  yangsik convert <md...> -p <profile> [-o 출력] [--format hwpx,hwp] [--report f] [--preview dir] [--no-mermaid] [--strict] [--json]
   yangsik validate <md...> -p <profile> [--strict] [--json]
   yangsik profile check <profile> [--strict] [--json]
   yangsik profile test <profile> [--md 예제.md] [--no-mermaid] [--json]

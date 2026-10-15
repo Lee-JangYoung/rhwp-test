@@ -1,40 +1,49 @@
 # 아키텍처
 
-결정: [ADR-0001](../adr/0001-monorepo-core-cli-web.md), [ADR-0003](../adr/0003-environment-agnostic-core.md), [ADR-0005](../adr/0005-pin-rhwp-and-isolate-adapter.md), [ADR-0006](../adr/0006-template-registration-and-doctype-profile.md), [ADR-0007](../adr/0007-llm-by-host-agent-conversion-llm-free.md), [ADR-0008](../adr/0008-core-with-cli-mcp-web-adapters.md), [ADR-0009](../adr/0009-engine-interface.md), [ADR-0010](../adr/0010-hwpx-first-output.md), [ADR-0011](../adr/0011-core-adapter-split-by-injection.md), [ADR-0012](../adr/0012-repeat-block-by-table-clone.md), [ADR-0013](../adr/0013-runtime-and-package-manager.md)
+결정: [ADR-0001](../adr/0001-monorepo-core-cli-web.md), [0003](../adr/0003-environment-agnostic-core.md), [0005](../adr/0005-pin-rhwp-and-isolate-adapter.md), [0006](../adr/0006-template-registration-and-doctype-profile.md), [0007](../adr/0007-llm-by-host-agent-conversion-llm-free.md), [0008](../adr/0008-core-with-cli-mcp-web-adapters.md), [0009](../adr/0009-engine-interface.md), [0011](../adr/0011-core-adapter-split-by-injection.md), [0012](../adr/0012-repeat-block-by-table-clone.md), [0013](../adr/0013-runtime-and-package-manager.md), [0016](../adr/0016-profile-format-binding-tree.md), [0017](../adr/0017-llm-in-authoring-only.md), [0019](../adr/0019-multi-format-output.md)
 
 ## 패키지
 
 | 패키지 | 책임 |
 |---|---|
-| `core` | 양식 분석, 프로필 로드·검증, md 파싱, IR, 렌더 계획, 변환, 검증. rhwp 호출은 엔진 인터페이스 뒤(`engines/rhwp`)에만([engine-interface.md](engine-interface.md)) |
-| `cli` | 인자 처리, 파일 I/O, Mermaid 렌더(`mermaid-cli`), 리포트 출력 |
-| `mcp` | LLM 에이전트용 도구 노출(stdio) |
-| `web` | 프로필 선택, 업로드/다운로드, SVG 미리보기 (후순위) |
+| `core` | md 읽기(`markdown/`), 프로필 형식·점검·가이드(`profile/`), 변환·자체 검증(`convert/`), 엔진 인터페이스와 rhwp 구현(`engine/`). 환경 독립. Node 전용(파일 변환, WASM 로드, Mermaid)은 `@yangsik/core/node` |
+| `author` | 양식 등록 단계의 LLM 연결(프로필 생성·검토, LangChain). **LLM 의존은 여기에만** |
+| `cli` | `node:util.parseArgs` 어댑터. 파일 I/O, 종료 코드, 보고서. 필수 의존에 LLM 라이브러리 없음 |
+| `mcp` | LLM 에이전트용 도구(stdio). 허용 폴더(`PathGuard`) 제한. 서버는 LLM을 부르지 않음 |
+| `web` | React + MUI. 브라우저 안에서 변환, `@rhwp/editor`로 표시 |
+| (계획) `erd`, `export` | ERD PNG, Office 출력 — [ADR-0019](../adr/0019-multi-format-output.md), [I-11](../07-implementation/I-11-erd.md)·[I-12](../07-implementation/I-12-office-export.md) |
 
-스택: TypeScript, Node 24 LTS, pnpm 12 workspace, Vitest, Playwright, remark/unified, yaml, Ajv, Vite, React(+MUI, 후순위). 버전은 정확히 고정([ADR-0013](../adr/0013-runtime-and-package-manager.md)).
-프로필 저장·관리와 다중 사용자(서버) 제공 방식은 **미결**이다.
+스택: TypeScript 7, Node 24 LTS, pnpm 12 workspace, Biome, Vitest, Playwright, remark/unified, yaml, Ajv, Vite, React 19 + MUI 9. 버전은 정확히 고정([ADR-0013](../adr/0013-runtime-and-package-manager.md)). 프로필 저장·관리와 다중 사용자(서버)는 미결.
 
-## 두 흐름
+## 흐름
 
 ```
-[등록] 샘플 양식 → 분석(core) → 해석 초안(호스트 LLM) → 스키마 검증·조립(core) → 사람 승인 → 프로필
-[변환] md → ① parse → ② normalize(IR) → ③ preprocess(Mermaid→이미지) → ④ plan(프로필 적용)
-         → ⑤ execute(엔진: 양식 로드·필드·본문·스타일) → ⑥ export(HWPX) → ⑦ verify
+[등록, 양식당 1회] 양식 → 분석 → 프로필 초안(사람 또는 author의 LLM) → 점검·드라이런 → 사람 승인 → templates/<유형>/
+[변환, 문서마다]  md → ① 읽기(프로필 규칙→데이터 트리) → ② 규약 검증(JSON Schema)
+                    → ③ 프로필 점검(checkProfile → Plan) → ④ Mermaid 렌더(주입된 렌더러)
+                    → ⑤ 실행(엔진 세션: 필드·셀·행·복제·삭제·그림, 배치 조판)
+                    → ⑥ 저장(HWPX) → ⑦ 자체 검증(재로드 대조) → [⑧ HWP 5.0 저장·검증]
 ```
+- ①②③은 엔진과 무관한 순수 함수, ⑤⑥⑧과 양식 분석만 엔진에 의존한다. 변환 경로에는 LLM이 없다([ADR-0007](../adr/0007-llm-by-host-agent-conversion-llm-free.md)).
+- md 위반은 줄 번호와 함께 LLM에 되돌려 수정시킨다(자기 교정 루프는 호스트 에이전트 몫).
+- 데이터 구조: [data-model.md](data-model.md)
 
-- 등록·변환 모두 ①~④와 분석은 rhwp와 무관한 순수 함수(단위 테스트 용이), ⑤⑥과 양식 분석의 rhwp 조회만 엔진에 의존한다.
-- 변환 경로에는 LLM이 없다([ADR-0007](../adr/0007-llm-by-host-agent-conversion-llm-free.md)). 상세: [doctype-profile.md](../04-conversion/doctype-profile.md)
+## 출력 포맷 ([ADR-0019](../adr/0019-multi-format-output.md))
+| 종류 | 포맷 | 방식 | 검증 |
+|---|---|---|---|
+| 기준 | HWPX | 양식 파일을 엔진으로 채움 | 재로드 대조(필드·표·행·그림·쪽 나눔·높이) |
+| 엔진 파생 | HWP 5.0 | 같은 세션 `exportHwp()` | HWPX 재로드와 내용 비교(쪽 수는 알림) |
+| 모델 파생(계획) | ERD PNG, DOCX·XLSX·PPTX | md 데이터 트리에서 생성 | 내용 충실도 |
 
 ## 환경 주입
-
-| 항목 | CLI/MCP(Node) | 웹 |
+| 항목 | Node(CLI/MCP) | 브라우저(웹) |
 |---|---|---|
-| WASM 로드 | `initSync({module: bytes})` | `init({module_or_path})` |
-| `measureTextWidth` | 폭 계산 경로 확인 필요 (S-11) | Canvas 2D `measureText` |
-| 에셋 읽기 | `fs` | `File`/`fetch` |
-| 다이어그램 | `mermaid-cli` | 브라우저 mermaid |
+| WASM 로드 | `initSync` | `init` |
+| 다이어그램 | mermaid-cli(격리: strict, 네트워크 차단) | 브라우저 mermaid |
+| 파일 | `fs` | `File`/`fetch` |
 
-환경 차이는 세 곳(WASM 초기화, Mermaid 렌더, 파일 입출력)이며 `Env` 객체 대신 **엔진 팩토리와 렌더러 주입**으로 푼다([ADR-0011](../adr/0011-core-adapter-split-by-injection.md)): `createRhwpEngine(init)`, `convertBytes(engine, { mdText, template, schema, renderDiagram? })`. PoC로 Node와 브라우저 모두 확인(S-18).
+환경 차이는 **엔진 팩토리와 렌더러 주입**으로 푼다([ADR-0011](../adr/0011-core-adapter-split-by-injection.md)): `createRhwpEngine(init)`, `convertBytes(engine, {…, renderDiagram?, formats?})`.
 
 ## 오류 원칙
-미지원 요소와 없는 스타일은 실패 대신 경고로 보고하고 대체 처리한다(`--strict`면 실패). 저장 손실은 리포트에 포함한다.
+- 프로필·md 문제는 **변환 전에** 코드·경로·줄·후보와 함께 막는다(점검=변환). 정책(`policy`)에 따라 경고로 낮출 수 있다.
+- 변환 후 자체 검증 실패는 종료 코드 2. HWP 저장·검증 실패는 HWPX 산출물을 막지 않고 보고에 남긴다(검증을 통과하지 못한 HWP 파일은 쓰지 않음).

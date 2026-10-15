@@ -5,6 +5,11 @@
   "files": [
     {
       "file": "files/01-유스케이스-기본.hwpx",
+      "hwpNotes": [],
+      "hwp": {
+        "file": "files/01-유스케이스-기본.hwp",
+        "sha256": "4c9d13c4ebfd4a78b5a94c48ec4cbb7631d5adb7dba4e015db89b172e7d3f4af"
+      },
       "title": "유스케이스 기본(표 3개 복제, Mermaid 그림)",
       "sha256": "908d075fc4ef58261fa46670e27c125b9905bcc336bb6d0d5e2a8efefead9871",
       "pages": 2,
@@ -14,6 +19,11 @@
     },
     {
       "file": "files/02-유스케이스-긴표.hwpx",
+      "hwpNotes": [],
+      "hwp": {
+        "file": "files/02-유스케이스-긴표.hwp",
+        "sha256": "9001a384f007bdce36d172304b93d3d92f674fcf8f51c328d08ce341d7e2b689"
+      },
       "title": "유스케이스 긴 표(쪽 경계, 떠 있는 표)",
       "sha256": "1d853d45e9bf5b09d9badc57c545d24dd3c3df1c629adbaff146b0d8f7bf07f0",
       "pages": 3,
@@ -23,6 +33,11 @@
     },
     {
       "file": "files/03-유스케이스-표높이맞춤없음-비교용.hwpx",
+      "hwpNotes": [],
+      "hwp": {
+        "file": "files/03-유스케이스-표높이맞춤없음-비교용.hwp",
+        "sha256": "d9fdd880e2e85cbe6b9c136b4fafd52559380ff4ad5e84c25141ee3ac55fbfe9"
+      },
       "title": "표 높이 맞춤을 끈 비교용(의도적으로 낡은 표 높이)",
       "sha256": "2382d3d35621680fc2b809ebeebbc7c3e86d058e8cb53ca18289281f5190f7e0",
       "pages": 2,
@@ -32,6 +47,11 @@
     },
     {
       "file": "files/04-유스케이스-글자처럼취급표.hwpx",
+      "hwpNotes": ["rhwp 조판 기준 쪽 수가 다름: HWPX 1쪽 / HWP 3쪽 (내용은 같음)"],
+      "hwp": {
+        "file": "files/04-유스케이스-글자처럼취급표.hwp",
+        "sha256": "e592fa51fe0a1717e379c2986c96f9cbf9805ecb759ea47460adb6e0f1c1919e"
+      },
       "title": "표를 \"글자처럼 취급\"으로 만든 양식(긴 표)",
       "sha256": "bce1417c3543e878ed8c69777b67274706de752567d39dda0cf4d0e663a8189a",
       "pages": 1,
@@ -41,6 +61,11 @@
     },
     {
       "file": "files/05-클래스명세서.hwpx",
+      "hwpNotes": [],
+      "hwp": {
+        "file": "files/05-클래스명세서.hwp",
+        "sha256": "214daf1038a2037f83f18f8df6fc9ba01b6adfe53004b455bb834c98334be4dd"
+      },
       "title": "클래스 명세서(표 묶음 복제, 행 목록, 중첩 반복, 표 삭제)",
       "sha256": "3a4b567efae68ed188d6fe7da37e3a3374986592c17662a7dc602ccd4461fc08",
       "pages": 2,
@@ -50,6 +75,11 @@
     },
     {
       "file": "files/06-DB명세서.hwpx",
+      "hwpNotes": [],
+      "hwp": {
+        "file": "files/06-DB명세서.hwp",
+        "sha256": "1c39cc72452d87178c2b44673634f1eb5338f9ce1a5405fa09c29046f80f15be"
+      },
       "title": "DB 명세서(행·표 삭제)",
       "sha256": "3cd40fef5c43b646130df825180f160eede25f4e3925495f2137cc061d709f51",
       "pages": 1,
@@ -59,6 +89,11 @@
     },
     {
       "file": "files/07-보고서-토큰문단.hwpx",
+      "hwpNotes": [],
+      "hwp": {
+        "file": "files/07-보고서-토큰문단.hwp",
+        "sha256": "48ae6aeb2094f239fe3119405a6f53a8dd874aafc9e260be8f066353a71928a4"
+      },
       "title": "보고서(토큰 치환, 표식 문단을 목록으로 전개)",
       "sha256": "a1b3d3304fd5649f58364804472aef9572944d5981f36647cf41ac849bd8c09a",
       "pages": 1,

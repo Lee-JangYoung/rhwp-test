@@ -3,8 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { describe, expect, it } from 'vitest';
 import { createServer } from '../src/server';
 
@@ -141,6 +141,23 @@ describe('MCP 서버: 변환 도구', () => {
     expect(existsSync(join(work, 'out/bad.hwpx'))).toBe(false);
     const prev = (await call(c, 'preview_output', { file_path: out })).json;
     expect(prev?.svg).toContain('<svg');
+  });
+
+  it('convert_md formats:["hwp"]: 같은 이름의 .hwp(CFB)도 저장한다', async () => {
+    const c = await connect();
+    const r = (
+      await call(c, 'convert_md', {
+        profile_path: join(UC, 'profile.yaml'),
+        md_text: readFileSync(join(UC, 'example.md'), 'utf8'),
+        out_path: join(work, 'out/both.hwpx'),
+        skip_diagrams: true,
+        formats: ['hwpx', 'hwp'],
+      })
+    ).json;
+    expect(r).toMatchObject({ ok: true, outHwp: expect.stringContaining('both.hwp'), hwp: { ok: true } });
+    expect(readFileSync(join(work, 'out/both.hwp')).subarray(0, 4).toString('hex')).toBe('d0cf11e0');
+    // 기본(formats 생략)은 .hwp를 만들지 않는다
+    expect(existsSync(join(work, 'out/uc.hwp'))).toBe(false);
   });
 
   it('클래스 명세서도 같은 도구로 변환된다', async () => {

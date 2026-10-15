@@ -120,7 +120,7 @@ for (const j of jobs) {
   const template = j.template ?? new Uint8Array(readFileSync(join(dir, 'template.hwpx')));
   const dataSchema = loaded.schemaPath ? (JSON.parse(readFileSync(loaded.schemaPath, 'utf8')) as object) : undefined;
   const md = readFileSync(join(dir, j.md), 'utf8');
-  const { bytes, report, previews } = await convertBytes(rhwpEngine, {
+  const { bytes, hwp, report, previews } = await convertBytes(rhwpEngine, {
     profile,
     mdText: md,
     template,
@@ -130,13 +130,25 @@ for (const j of jobs) {
     skipDiagrams: !hasChromium,
     output: j.fitHeights === false ? { fitHeights: false } : undefined,
     preview: true,
+    formats: ['hwpx', 'hwp'],
   });
   writeFileSync(join(OUT, 'files', `${j.file}.hwpx`), bytes);
+  const hwpOk = !!(hwp && report.hwp?.ok);
+  if (hwp && hwpOk) writeFileSync(join(OUT, 'files', `${j.file}.hwp`), hwp);
   const pdir = join(OUT, 'rhwp-preview', j.file);
   mkdirSync(pdir, { recursive: true });
   for (const [i, svg] of previews.entries()) writeFileSync(join(pdir, `page-${i + 1}.svg`), svg);
   manifest.push({
     file: `files/${j.file}.hwpx`,
+    hwpNotes: report.hwp?.notes ?? [],
+    hwp: hwpOk
+      ? {
+          file: `files/${j.file}.hwp`,
+          sha256: createHash('sha256')
+            .update(hwp as Uint8Array)
+            .digest('hex'),
+        }
+      : null,
     title: j.title,
     sha256: createHash('sha256').update(bytes).digest('hex'),
     pages: report.pages,
@@ -174,6 +186,7 @@ const checklist = `# 한컴 확인 점검표 (S-23)
 - 비표준 항목(\`META-INF/rhwp-hwp5-origin\`)과 비어 있는 \`lineseg\` 때문에 경고가 뜨는가
 - 쪽수가 rhwp 미리보기(\`MANIFEST.json\`의 pages)와 같은가
 - 열어서 저장(다른 이름으로 .hwpx)한 뒤 다시 열어도 내용이 같은가
+- 같은 이름의 \`.hwp\`(HWP 5.0)도 열리고, \`.hwpx\`와 쪽수·표·값·그림이 같은가 (rhwp가 HWPX에서 변환해 저장한 파일이라 한컴 열림은 미확인)
 
 ## 파일별
 ${jobs.map((j) => `### ${j.file}.hwpx — ${j.title}\n${j.checks.map((c) => `- [ ] ${c}`).join('\n')}`).join('\n\n')}
@@ -193,7 +206,7 @@ writeFileSync(
 
 | 파일 | 열림 | 쪽수(한컴/rhwp) | 모양 일치 | 판정(합격/보류/불합격) | 비고(스크린샷 파일명 등) |
 |---|---|---|---|---|---|
-${jobs.map((j) => `| ${j.file}.hwpx |  |  /  |  |  |  |`).join('\n')}
+${jobs.flatMap((j) => [`| ${j.file}.hwpx |  |  /  |  |  |  |`, `| ${j.file}.hwp |  |  /  |  |  |  |`]).join('\n')}
 
 이 표를 채운 뒤 \`_spec/06-quality/verification-spike.md\`의 S-23 행과 \`known-limitations.md\`(L-14/15/17/20/22)를 갱신합니다.
 `,

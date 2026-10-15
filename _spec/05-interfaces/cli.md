@@ -4,7 +4,7 @@
 
 ```bash
 yangsik doctor                                     # 환경 점검(rhwp, Chromium, Node)
-yangsik convert <md...> -p <profile> [-o 출력] [--report f] [--preview dir] [--no-mermaid] [--strict] [--json]
+yangsik convert <md...> -p <profile> [-o 출력] [--format hwpx,hwp] [--report f] [--preview dir] [--no-mermaid] [--strict] [--json]
 yangsik validate <md...> -p <profile> [--strict] [--json]
 yangsik profile check <profile> [--strict] [--json]       # 문법·스키마·양식 대조 (줄 번호·후보)
 yangsik profile test <profile> [--md 예제.md] [--no-mermaid]  # 드라이런 + 매핑 대조표
@@ -14,6 +14,7 @@ yangsik profile generate --template 양식.hwpx --example-md 예제.md --provide
 ```
 
 - `-o`: 하나뿐이고 `.hwpx`로 끝나면 그 파일, 아니면 폴더(기본 `out/`)에 md 이름으로 쓴다. 여러 md 중 일부가 위반이어도 나머지는 변환하고 종료 코드는 가장 나쁜 것을 따른다.
+- `--format`: 기본 `hwpx`. `hwpx,hwp`면 같은 이름의 `.hwp`(HWP 5.0)도 저장한다. HWPX는 항상 만든다. HWP는 HWPX 재로드와 내용(표·셀·필드·그림)이 같을 때만 쓰고, 다르면 쓰지 않고 종료 코드 2. 쪽 수 차이는 `⚠` 경고만 한다([I-10](../07-implementation/I-10-hwp-output.md), L-23).
 - 종료 코드: `0` 성공(경고 가능) · `1` 입력/설정 오류(md 규약 위반, 프로필 오류, 인자 오류) · `2` 변환은 했으나 자체 검증 실패 · `3` 예기치 못한 오류 · `4` `--strict`에서 경고.
 - `--json`: stdout에는 JSON 하나만 나오고 사람용 문장은 stderr로 간다.
 - 네트워크는 `profile generate`에서만 쓴다. `--allow-send` 없이는 호출하지 않으며 `--print-prompt`로 전송 내용(가이드·양식 사실·예제 md, HWPX 바이너리 제외)을 미리 본다. 제공자 패키지(`@langchain/anthropic` 등)는 필요한 것만 설치하고 키는 환경변수로 준다. 결과는 `--out`에 `profile.yaml`·`review.md`·`review.json`.

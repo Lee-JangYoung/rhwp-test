@@ -60,6 +60,8 @@ export function App() {
   const [violations, setViolations] = useState<string[]>([]);
   const [report, setReport] = useState<ConvertReport | null>(null);
   const [result, setResult] = useState<Uint8Array | null>(null);
+  /** 최종 변환에서 만든 HWP 5.0(자체 검증을 통과한 경우만) */
+  const [resultHwp, setResultHwp] = useState<Uint8Array | null>(null);
   const [view, setView] = useState<View>('template');
   const [open, setOpen] = useState({ mapping: true, report: true, profile: false });
   const [status, setStatus] = useState('양식 불러오는 중…');
@@ -78,6 +80,7 @@ export function App() {
     setMd(doctype.example);
     setTemplateName(`${doctype.id}/template.hwpx (내장 합성 양식)`);
     setResult(null);
+    setResultHwp(null);
     setReport(null);
     setViolations([]);
     setView('template');
@@ -150,15 +153,17 @@ export function App() {
         renderDiagram: full ? renderDiagram : undefined,
         skipDiagrams: !full, // 빠른 미리보기는 그림을 명시적으로 생략한다
         preview: false,
+        formats: full ? ['hwpx', 'hwp'] : ['hwpx'],
       });
       if (my !== seq.current) return; // 더 최근 요청이 있으면 버린다
       setViolations([]);
       setReport(out.report);
       setResult(out.bytes);
+      setResultHwp(out.hwp && out.report.hwp?.ok ? out.hwp : null);
       setView('result');
       await show(out.bytes, 'result.hwpx');
       setStatus(
-        `${full ? '변환 완료' : '미리보기 완료(Mermaid 그림 제외)'} — 자체 검증 ${out.report.verify.ok ? '통과' : '실패'}`,
+        `${full ? '변환 완료' : '미리보기 완료(Mermaid 그림 제외)'} — 자체 검증 ${out.report.verify.ok ? '통과' : '실패'}${out.report.hwp ? `, HWP ${out.report.hwp.ok ? '통과' : '실패'}` : ''}`,
       );
     } catch (e) {
       if (my !== seq.current) return;
@@ -186,6 +191,7 @@ export function App() {
     setTemplate(new Uint8Array(await file.arrayBuffer()));
     setTemplateName(file.name);
     setResult(null);
+    setResultHwp(null);
     setReport(null);
     setView('template');
   };
@@ -391,6 +397,15 @@ export function App() {
                     {...tid('download')}
                   >
                     변환 결과 저장
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => resultHwp && saveBlob(resultHwp, 'result.hwp')}
+                    disabled={!resultHwp}
+                    {...tid('download-hwp')}
+                  >
+                    HWP 저장
                   </Button>
                   <Button size="small" variant="outlined" onClick={() => void exportFromEditor()} {...tid('export')}>
                     에디터 내용 내보내기

@@ -319,6 +319,10 @@ export class RhwpSession implements DocumentSession {
     return this.doc.exportHwpx();
   }
 
+  exportHwp(): Uint8Array {
+    return this.doc.exportHwp();
+  }
+
   analyze(): TemplateAnalysis {
     const info = JSON.parse(this.doc.getDocumentInfo()) as { fontsUsed?: string[] };
     // 구역 1 이후의 표는 문단 번호가 구역 기준이라 구역 0으로 해석하면 실패한다(PoC는 구역 0만 지원). 해석 가능한 표만 담는다.

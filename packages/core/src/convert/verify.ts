@@ -1,5 +1,5 @@
+import type { DocumentEngine, DocumentSession, PageBreakMode } from '../engine/types';
 import { type LabelOptions, readBlock } from './blocks';
-import type { DocumentEngine, PageBreakMode } from '../engine/types';
 
 export interface Check {
   name: string;
@@ -188,4 +188,111 @@ export async function verifyOutput(engine: DocumentEngine, bytes: Uint8Array, ex
   } finally {
     s.dispose();
   }
+}
+
+/** HWPX와 HWP 5.0이 같은 내용이어야 하는 항목을 뽑은 요약 */
+interface Snapshot {
+  pages: number;
+  fields: Record<string, string | null>;
+  tables: string[][];
+  gso: number;
+}
+
+function snapshot(s: DocumentSession, fieldNames: string[]): Snapshot {
+  return {
+    pages: s.pageCount(),
+    fields: Object.fromEntries(
+      fieldNames.map((n) => {
+        try {
+          return [n, s.getField(n)];
+        } catch {
+          return [n, null]; // 필드가 없으면 엔진이 던진다
+        }
+      }),
+    ),
+    tables: s.topTables().map((t) =>
+      s
+        .tableCells(t)
+        .map((c) => `${c.row},${c.col}:${c.text}`)
+        .sort(),
+    ),
+    gso: s.controlCounts().gso ?? 0,
+  };
+}
+
+/** HWP 5.0 바이트 점검: CFB 서명(D0 CF 11 E0 A1 B1 1A E1) */
+export function checkCfbHeader(bytes: Uint8Array): Check {
+  const sig = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1];
+  const ok = bytes.length >= 8 && sig.every((b, i) => bytes[i] === b);
+  return { name: 'HWP: CFB 서명', ok, detail: ok ? undefined : '파일이 HWP 5.0(CFB)이 아님' };
+}
+
+export interface HwpVerifyReport {
+  /** 내용(표·셀 텍스트·누름틀·그림)이 HWPX와 같은가. 쪽 수 차이는 notes로만 알린다 */
+  ok: boolean;
+  checks: Check[];
+  /** 막지는 않지만 알아야 할 차이(조판 차이로 쪽 수가 다름 등) */
+  notes: string[];
+  bytes: number;
+}
+
+/** 저장한 HWP를 다시 열어 같은 내용의 HWPX 재로드 결과와 비교한다 */
+export async function verifyHwp(
+  engine: DocumentEngine,
+  hwp: Uint8Array,
+  hwpx: Uint8Array,
+  fieldNames: string[],
+): Promise<HwpVerifyReport> {
+  const checks: Check[] = [checkCfbHeader(hwp)];
+  let ref: Snapshot | null = null;
+  const a = await engine.open(hwpx);
+  try {
+    ref = snapshot(a, fieldNames);
+  } finally {
+    a.dispose();
+  }
+  let got: Snapshot;
+  try {
+    const b = await engine.open(hwp);
+    try {
+      got = snapshot(b, fieldNames);
+    } finally {
+      b.dispose();
+    }
+  } catch (e) {
+    checks.push({ name: 'HWP 재로드 성공', ok: false, detail: (e as Error).message });
+    return { ok: false, checks, notes: [], bytes: hwp.length };
+  }
+  checks.push({ name: 'HWP 재로드 성공', ok: true });
+  // 쪽 수는 엔진 조판 차이일 수 있어(예: 글자처럼 취급 표, L-23) 내용 검증과 따로 알리기만 한다
+  const notes =
+    got.pages === ref.pages
+      ? []
+      : [`rhwp 조판 기준 쪽 수가 다름: HWPX ${ref.pages}쪽 / HWP ${got.pages}쪽 (내용은 같음)`];
+  checks.push({
+    name: 'HWP 표 수 = HWPX',
+    ok: got.tables.length === ref.tables.length,
+    detail:
+      got.tables.length === ref.tables.length ? undefined : `HWPX ${ref.tables.length} / HWP ${got.tables.length}`,
+  });
+  const badTables = ref.tables
+    .map((t, i) => (JSON.stringify(t) === JSON.stringify(got.tables[i]) ? -1 : i + 1))
+    .filter((i) => i > 0);
+  checks.push({
+    name: 'HWP 표별 셀 텍스트 = HWPX',
+    ok: badTables.length === 0,
+    detail: badTables.length ? `표 ${badTables.slice(0, 5).join(', ')} 불일치` : undefined,
+  });
+  const badFields = fieldNames.filter((n) => got.fields[n] !== ref?.fields[n]);
+  checks.push({
+    name: 'HWP 누름틀 값 = HWPX',
+    ok: badFields.length === 0,
+    detail: badFields.length ? badFields.slice(0, 5).join(', ') : undefined,
+  });
+  checks.push({
+    name: 'HWP 그림 수 = HWPX',
+    ok: got.gso === ref.gso,
+    detail: got.gso === ref.gso ? undefined : `HWPX ${ref.gso} / HWP ${got.gso}`,
+  });
+  return { ok: checks.every((c) => c.ok), checks, notes, bytes: hwp.length };
 }

@@ -89,6 +89,8 @@ export interface DocumentSession {
   bodyText(): string;
   renderSvg(page: number): string;
   export(): Uint8Array;
+  /** HWP 5.0(CFB) 바이너리로 저장한다. HWPX에서 연 문서는 HWPX→HWP 변환이 자동 적용된다 */
+  exportHwp(): Uint8Array;
   dispose(): void;
 }
 

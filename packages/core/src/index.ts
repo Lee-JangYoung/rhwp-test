@@ -4,7 +4,7 @@
  * 0.x 동안 API는 안정적이지 않다.
  */
 export { convertBytes, ProfileError, ValidationError } from './convert/convert';
-export type { ConvertInput, ConvertReport, DiagramRenderer, RenderedDiagram } from './convert/convert';
+export type { ConvertInput, ConvertReport, DiagramRenderer, OutputFormat, RenderedDiagram } from './convert/convert';
 export { previewMapping } from './convert/mapping';
 export { testProfile } from './convert/test-profile';
 export type { ProfileTestResult } from './convert/test-profile';
