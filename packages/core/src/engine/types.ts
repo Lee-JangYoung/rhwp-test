@@ -47,6 +47,11 @@ export interface DocumentSession {
   cloneTableAfter(src: TableRef, after: TableRef): TableRef;
   /** 셀 내용을 통째로 교체한다. '\n'은 셀 안 문단 나눔 */
   setCellText(t: TableRef, cellIdx: number, text: string): void;
+  /**
+   * 편집 호출 묶음을 배치로 실행한다(편집마다 조판을 다시 계산하지 않아 큰 문서에서 크게 빠르다).
+   * 배치 안에서는 조판 결과(쪽 수·렌더 높이·위치)를 읽지 말 것.
+   */
+  batch<T>(f: () => T): T;
   /** row 행 바로 아래에 같은 서식의 빈 행을 count개 추가한다 */
   insertRowsAfter(t: TableRef, row: number, count: number): void;
   /** 행을 지운다 */

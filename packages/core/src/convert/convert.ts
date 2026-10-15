@@ -543,7 +543,8 @@ export async function convertBytes(
 
     t0 = Date.now();
     const scopes: Scopes = [md.data];
-    run(profile.bindings, scopes, null, 'bindings', 'doc');
+    // 채우기는 한 배치로: 편집마다 조판을 다시 계산하면 문서가 커질수록 호출당 비용이 늘어난다(S-28)
+    s.batch(() => run(profile.bindings, scopes, null, 'bindings', 'doc'));
     const errs = issues.filter((x) => x.severity === 'error');
     if (errs.length) throw new ProfileError(errs);
     if (output.fitHeights) s.fitTableHeights();
@@ -566,18 +567,20 @@ export async function convertBytes(
         }
         rendered.push({ table: p.t.index, list });
       }
-      for (const r of [...rendered].sort((a, b) => b.table - a.table)) {
-        const ref = s.topTables()[r.table];
-        for (const d of [...r.list].reverse()) {
-          s.insertImageAfter(ref, {
-            bytes: d.bytes,
-            widthPx: d.widthPx,
-            heightPx: d.heightPx,
-            alt: `${d.alt} 다이어그램`,
-          });
-          imagesInserted++;
+      s.batch(() => {
+        for (const r of [...rendered].sort((a, b) => b.table - a.table)) {
+          const ref = s.topTables()[r.table];
+          for (const d of [...r.list].reverse()) {
+            s.insertImageAfter(ref, {
+              bytes: d.bytes,
+              widthPx: d.widthPx,
+              heightPx: d.heightPx,
+              alt: `${d.alt} 다이어그램`,
+            });
+            imagesInserted++;
+          }
         }
-      }
+      });
     }
     lap('mermaid+images', t0);
 

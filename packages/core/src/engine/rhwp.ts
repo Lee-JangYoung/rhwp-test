@@ -37,10 +37,17 @@ export class RhwpSession implements DocumentSession {
     return JSON.parse(this.doc.getControls()) as Ctrl[];
   }
 
+  /**
+   * 본문 표 목록은 문서 전체 컨트롤을 읽어 만들기 때문에 문서가 클수록 느리다(S-28: 호출당 20 ms, 1400회에 28 s).
+   * 문단·표 구조가 바뀌는 편집(복제·삭제·문단 전개·그림 삽입)에서만 다시 계산한다.
+   */
+  private topCache: TableRef[] | null = null;
+
   topTables(): TableRef[] {
-    return this.controls()
+    this.topCache ??= this.controls()
       .filter((c) => c.ctrlId === 'tbl' && c.list === 0)
       .map((c) => ({ para: c.para, ctrl: c.controlIndex }));
+    return [...this.topCache];
   }
 
   controlCounts(): Record<string, number> {
@@ -124,6 +131,7 @@ export class RhwpSession implements DocumentSession {
   }
 
   setParagraphLines(para: number, lines: string[]): void {
+    this.topCache = null;
     const d = this.doc;
     const len = d.getParagraphLength(0, para);
     if (len > 0) check(d.deleteText(0, para, 0, len), 'deleteText');
@@ -147,10 +155,12 @@ export class RhwpSession implements DocumentSession {
   }
 
   deleteTable(t: TableRef): void {
+    this.topCache = null;
     check(this.doc.deleteTableControl(0, t.para, t.ctrl), 'deleteTableControl');
   }
 
   cloneTableAfter(src: TableRef, after: TableRef): TableRef {
+    this.topCache = null;
     const d = this.doc;
     check(d.copyControl(0, src.para, '', src.ctrl), 'copyControl');
     check(d.insertParagraph(0, after.para + 1), 'insertParagraph');
@@ -159,6 +169,7 @@ export class RhwpSession implements DocumentSession {
   }
 
   insertImageAfter(t: TableRef, img: ImageInput): void {
+    this.topCache = null;
     const d = this.doc;
     const naturalHu = img.widthPx * HWPUNIT_PER_PX;
     const width = Math.min(naturalHu, MAX_IMAGE_WIDTH_HU);
@@ -222,34 +233,49 @@ export class RhwpSession implements DocumentSession {
     });
   }
 
+  /**
+   * 편집 호출 묶음을 배치로 실행한다. 배치 안에서는 편집마다 쪽 나눔(조판)을 다시 계산하지 않아
+   * 문서가 커져도 호출 비용이 늘지 않는다(S-28). 끝나면 한 번 계산한다.
+   * 배치 안에서는 조판 결과(쪽 수·렌더 높이)를 읽을 수 없다.
+   */
+  batch<T>(f: () => T): T {
+    this.doc.beginBatch();
+    try {
+      return f();
+    } finally {
+      this.doc.endBatch();
+    }
+  }
+
   fitTableHeights(): void {
     const d = this.doc;
-    const pages = d.pageCount();
+    // 1) 읽기(조판 필요): 표마다 셀의 렌더 높이를 모은다
+    const jobs: { t: TableRef; idx: number; h: number }[] = [];
     for (const t of this.topTables()) {
       // 쪽을 넘는 표는 셀이 쪽마다 조각나므로 조각 높이를 합산한다
       const px = new Map<number, number>();
       const single = new Set<number>();
-      for (let p = 0; p < pages; p++) {
-        const boxes = JSON.parse(d.getTableCellBboxes(0, t.para, t.ctrl, p)) as {
-          cellIdx: number;
-          rowSpan: number;
-          pageIndex: number;
-          h: number;
-        }[];
-        for (const b of boxes) {
-          if (b.pageIndex !== p) continue;
-          px.set(b.cellIdx, (px.get(b.cellIdx) ?? 0) + b.h);
-          if (b.rowSpan === 1) single.add(b.cellIdx);
-        }
+      // 쪽 번호 p로 부르면 p쪽 이후의 조각이 모두 돌아오므로, 0쪽으로 한 번만 부르면 모든 조각을 얻는다
+      // (표 × 쪽 수만큼 부르던 것을 표 수만큼으로 줄인다. 3쪽에 걸친 표에서 합집합이 같음을 확인했다)
+      const boxes = JSON.parse(d.getTableCellBboxes(0, t.para, t.ctrl, 0)) as {
+        cellIdx: number;
+        rowSpan: number;
+        h: number;
+      }[];
+      for (const b of boxes) {
+        px.set(b.cellIdx, (px.get(b.cellIdx) ?? 0) + b.h);
+        if (b.rowSpan === 1) single.add(b.cellIdx);
       }
       for (const [idx, h] of px) {
         if (!single.has(idx)) continue; // 행 병합 셀은 건드리지 않는다
-        check(
-          d.setCellProperties(0, t.para, t.ctrl, idx, JSON.stringify({ height: Math.round(h * HWPUNIT_PER_PX) })),
-          'setCellProperties',
-        );
+        jobs.push({ t, idx, h: Math.round(h * HWPUNIT_PER_PX) });
       }
     }
+    // 2) 쓰기(배치): 호출마다 다시 조판하지 않는다
+    this.batch(() => {
+      for (const j of jobs)
+        check(d.setCellProperties(0, j.t.para, j.t.ctrl, j.idx, JSON.stringify({ height: j.h })), 'setCellProperties');
+    });
   }
 
   pictureLayouts(): { treatAsChar: boolean; width: number; height: number }[] {
